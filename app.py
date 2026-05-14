@@ -176,7 +176,7 @@ def remove_topic(message):
 
     before = len(targets)
 
-targets = [
+    targets = [
         t for t in targets
         if not (
             int(t["chat_id"]) == int(message.chat.id)
