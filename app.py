@@ -4,19 +4,27 @@ from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTyp
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-TARGET_CHAT_ID = os.getenv("TARGET_CHAT_ID")
-TARGET_TOPIC_ID = os.getenv("TARGET_TOPIC_ID")
+SOURCE_CHAT_ID = int(os.getenv("SOURCE_CHAT_ID"))
+
+TARGET_CHAT_ID = int(os.getenv("TARGET_CHAT_ID"))
+
+TARGET_TOPIC_ID = int(os.getenv("TARGET_TOPIC_ID"))
 
 async def forwarder(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    if update.message:
+    if not update.message:
+        return
 
-        await context.bot.forward_message(
-            chat_id=int(TARGET_CHAT_ID),
-            from_chat_id=update.message.chat_id,
-            message_id=update.message.message_id,
-            message_thread_id=int(TARGET_TOPIC_ID)
-        )
+    # 只监听指定群
+    if update.message.chat_id != SOURCE_CHAT_ID:
+        return
+
+    await context.bot.forward_message(
+        chat_id=TARGET_CHAT_ID,
+        from_chat_id=update.message.chat_id,
+        message_id=update.message.message_id,
+        message_thread_id=TARGET_TOPIC_ID
+    )
 
 app = ApplicationBuilder().token(BOT_TOKEN).build()
 
