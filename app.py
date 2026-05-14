@@ -8,11 +8,13 @@ from collections import defaultdict
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 SOURCE_CHAT_ID = int(os.getenv("SOURCE_CHAT_ID"))
 
-OWNER_ID = 123456789  # 改成你的 Telegram ID
+# 改成你的 Telegram ID
+OWNER_ID = 123456789
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
 CONFIG_FILE = "targets.json"
+
 albums = defaultdict(list)
 timers = {}
 
@@ -38,15 +40,24 @@ def is_admin(message):
 def is_owner(message):
     return message.from_user.id == OWNER_ID
 
+# =========================
+# /settopic
+# Admin + Owner
+# =========================
 @bot.message_handler(commands=["settopic"])
 def set_topic(message):
-    if not is_admin(message):
-        bot.reply_to(message, "❌ Only admins can use this command.")
+
+    if not is_admin(message) and not is_owner(message):
+        bot.reply_to(
+            message,
+            "❌ Only admins or owner can use this command."
+        )
         return
 
     topic_id = getattr(message, "message_thread_id", None)
 
     targets = load_targets()
+
     new_target = {
         "chat_id": message.chat.id,
         "topic_id": topic_id
@@ -58,91 +69,140 @@ def set_topic(message):
 
     bot.reply_to(
         message,
-        f"✅ Added forward target!\nChat ID: {message.chat.id}\nTopic ID: {topic_id}\nTotal targets: {len(targets)}"
+        f"✅ Topic added!\n\n"
+        f"Chat ID: {message.chat.id}\n"
+        f"Topic ID: {topic_id}\n"
+        f"Total targets: {len(targets)}"
     )
 
-@bot.message_handler(commands=["listtopics"])
-def list_topics(message):
-    if not is_admin(message):
-        bot.reply_to(message, "❌ Only admins can use this command.")
+# =========================
+# /listtopic
+# Admin + Owner
+# =========================
+@bot.message_handler(commands=["listtopic"])
+def list_topic(message):
+
+    if not is_admin(message) and not is_owner(message):
+        bot.reply_to(
+            message,
+            "❌ Only admins or owner can use this command."
+        )
         return
 
     targets = load_targets()
 
     if not targets:
-        bot.reply_to(message, "No forward targets set.")
+        bot.reply_to(message, "❌ No topics saved.")
         return
 
-    text = "📌 Forward targets:\n\n"
+    text = "📌 Saved Topics:\n\n"
+
     for i, t in enumerate(targets, 1):
-        text += f"{i}. Chat ID: {t['chat_id']} | Topic ID: {t['topic_id']}\n"
+        text += (
+            f"{i}.\n"
+            f"Chat ID: {t['chat_id']}\n"
+            f"Topic ID: {t['topic_id']}\n\n"
+        )
 
     bot.reply_to(message, text)
 
+# =========================
+# /clearall
+# ONLY OWNER
+# Delete 5000 messages
+# =========================
 @bot.message_handler(commands=["clearall"])
-def clear_all_messages(message):
+def clear_all(message):
+
     if not is_owner(message):
-        bot.reply_to(message, "❌ Only bot owner can use this command.")
+        bot.reply_to(
+            message,
+            "❌ Only bot owner can use this command."
+        )
         return
 
     topic_id = getattr(message, "message_thread_id", None)
 
     if not topic_id:
-        bot.reply_to(message, "❌ Use /clearall inside a topic.")
+        bot.reply_to(
+            message,
+            "❌ Use this command inside a topic."
+        )
         return
 
     deleted = 0
     latest_id = message.message_id
 
     for msg_id in range(latest_id, latest_id - 5000, -1):
+
         try:
             bot.delete_message(
                 chat_id=message.chat.id,
                 message_id=msg_id
             )
+
             deleted += 1
+
             time.sleep(0.03)
+
         except:
             pass
 
     bot.send_message(
         chat_id=message.chat.id,
-        text=f"✅ Deleted {deleted} messages from this topic.",
+        text=f"✅ Deleted {deleted} messages.",
         message_thread_id=topic_id
     )
 
+# =========================
+# Forward
+# =========================
 def forward_to_all(message_ids):
+
     targets = load_targets()
 
     for target in targets:
+
         chat_id = target["chat_id"]
         topic_id = target["topic_id"]
 
         try:
+
             if len(message_ids) == 1:
+
                 bot.forward_message(
                     chat_id=chat_id,
                     from_chat_id=SOURCE_CHAT_ID,
                     message_id=message_ids[0],
                     message_thread_id=topic_id
                 )
+
             else:
+
                 bot.forward_messages(
                     chat_id=chat_id,
                     from_chat_id=SOURCE_CHAT_ID,
                     message_ids=message_ids,
                     message_thread_id=topic_id
                 )
-        except Exception as e:
-            print(f"Forward failed to {chat_id}/{topic_id}: {e}")
 
+        except Exception as e:
+            print(f"Forward failed: {e}")
+
+# =========================
+# Album Sender
+# =========================
 def send_album(media_group_id):
+
     messages = albums.pop(media_group_id, [])
     timers.pop(media_group_id, None)
 
     if messages:
         forward_to_all(sorted(messages))
 
+# =========================
+# Message Handler
+# =========================
 @bot.message_handler(content_types=[
     "photo",
     "video",
@@ -153,11 +213,15 @@ def send_album(media_group_id):
     "text"
 ])
 def handle_message(message):
+
     if message.chat.id != SOURCE_CHAT_ID:
         return
 
-if getattr(message, "media_group_id", None):
+    # Album
+    if getattr(message, "media_group_id", None):
+
         group_id = message.media_group_id
+
         albums[group_id].append(message.message_id)
 
         if group_id in timers:
@@ -173,7 +237,9 @@ if getattr(message, "media_group_id", None):
         timer.start()
 
     else:
+
         forward_to_all([message.message_id])
 
 print("Bot started...")
+
 bot.infinity_polling()
