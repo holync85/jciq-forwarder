@@ -9,7 +9,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 SOURCE_CHAT_ID = int(os.getenv("SOURCE_CHAT_ID"))
 
 # 改成你的 Telegram ID
-OWNER_ID = 6527570402
+OWNER_ID =6527570402
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
