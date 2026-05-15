@@ -89,7 +89,8 @@ def log_sent_message(chat_id, topic_id, message_id):
 def is_admin(message):
     try:
         admins = bot.get_chat_administrators(message.chat.id)
-        return message.from_user.id in [a.user.id for a in admins]
+        admin_ids = [a.user.id for a in admins]
+        return message.from_user.id in admin_ids
     except:
         return False
 
@@ -187,7 +188,6 @@ def remove_topic(message):
         return
 
     topic_id = getattr(message, "message_thread_id", None)
-
     targets = load_targets(group_no)
     before = len(targets)
 
@@ -249,6 +249,36 @@ def clear_all(message):
         text=f"✅ Deleted {deleted} forwarded messages from this topic only.",
         message_thread_id=topic_id
     )
+
+@bot.message_handler(commands=["clearfull"])
+def clear_full(message):
+    if not is_owner(message):
+        bot.reply_to(message, "❌ Only bot owner can use this command.")
+        return
+
+    deleted = 0
+    latest_id = message.message_id
+
+    bot.reply_to(message, "🗑 Clearing full group messages...")
+
+    for msg_id in range(latest_id, latest_id - 5000, -1):
+        try:
+            bot.delete_message(
+                chat_id=message.chat.id,
+                message_id=msg_id
+            )
+            deleted += 1
+            time.sleep(0.03)
+        except:
+            pass
+
+    try:
+        bot.send_message(
+            chat_id=message.chat.id,
+            text=f"✅ Full group clear done.\nDeleted: {deleted}"
+        )
+    except:
+        pass
 
 def forward_to_targets(group_no, message_ids):
     targets = load_targets(group_no)
