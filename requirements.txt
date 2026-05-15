@@ -1,2 +1,3 @@
 pyTelegramBotAPI==4.27.0
 requests
+deep-translator==1.11.4
