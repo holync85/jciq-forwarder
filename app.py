@@ -11,7 +11,6 @@ from telebot.types import InputMediaPhoto, InputMediaVideo
 from deep_translator import MyMemoryTranslator
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-
 OWNER_ID = 6527570402
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
@@ -32,49 +31,30 @@ TRANSLATE_FILE = "translate_settings.json"
 albums = defaultdict(list)
 timers = {}
 
-# =========================
-# GitHub Storage
-# =========================
+DELETE_RANGE = 200
+ALBUM_DELAY = 2.0
 
 def github_get_file(path):
-
     try:
-
         url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{path}"
-
-        headers = {
-            "Authorization": f"token {GITHUB_TOKEN}"
-        }
-
+        headers = {"Authorization": f"token {GITHUB_TOKEN}"}
         r = requests.get(url, headers=headers)
 
         if r.status_code == 200:
-
             data = r.json()
-
-            content = base64.b64decode(
-                data["content"]
-            ).decode("utf-8")
-
+            content = base64.b64decode(data["content"]).decode("utf-8")
             return json.loads(content)
-
-    except:
-        pass
+    except Exception as e:
+        print("GitHub get error:", e)
 
     return {}
 
 def github_save_file(path, content_json):
-
     try:
-
         url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{path}"
-
-        headers = {
-            "Authorization": f"token {GITHUB_TOKEN}"
-        }
+        headers = {"Authorization": f"token {GITHUB_TOKEN}"}
 
         old_sha = None
-
         r = requests.get(url, headers=headers)
 
         if r.status_code == 200:
@@ -96,11 +76,7 @@ def github_save_file(path, content_json):
         requests.put(url, headers=headers, json=payload)
 
     except Exception as e:
-        print(e)
-
-# =========================
-# Load / Save
-# =========================
+        print("GitHub save error:", e)
 
 def load_targets():
     return github_get_file(CONFIG_FILE)
@@ -114,53 +90,35 @@ def load_translate_settings():
 def save_translate_settings(data):
     github_save_file(TRANSLATE_FILE, data)
 
-# =========================
-# Helpers
-# =========================
-
 def get_chat_topic_key(message):
-
     topic_id = getattr(message, "message_thread_id", 0)
-
     return f"{message.chat.id}_{topic_id}"
 
 def is_admin(chat_id, user_id):
-
     try:
-
         admins = bot.get_chat_administrators(chat_id)
-
-        return any(
-            admin.user.id == user_id
-            for admin in admins
-        )
-
+        return any(admin.user.id == user_id for admin in admins)
     except:
         return False
 
+def is_admin_or_owner(message):
+    return is_admin(message.chat.id, message.from_user.id) or message.from_user.id == OWNER_ID
+
 def has_thai(text):
-    return any('\u0E00' <= c <= '\u0E7F' for c in text)
+    return any("\u0E00" <= c <= "\u0E7F" for c in text)
 
 def has_chinese(text):
-    return any('\u4e00' <= c <= '\u9fff' for c in text)
+    return any("\u4e00" <= c <= "\u9fff" for c in text)
 
 def has_english(text):
     return any(c.isalpha() and ord(c) < 128 for c in text)
 
 def has_vietnamese(text):
-
     chars = "ăâđêôơưáàảãạấầẩẫậắằẳẵặéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹỵ"
-
     return any(c in chars for c in text.lower())
 
-# =========================
-# Translation
-# =========================
-
 def translate_text(text, source, target):
-
     try:
-
         time.sleep(1.5)
 
         code_map = {
@@ -178,15 +136,9 @@ def translate_text(text, source, target):
         return result
 
     except Exception as e:
-
         return f"⚠️ Translate busy.\n{e}"
 
-# =========================
-# Auto Translate
-# =========================
-
 def auto_translate(message):
-
     if not message.text:
         return
 
@@ -194,23 +146,15 @@ def auto_translate(message):
         return
 
     settings = load_translate_settings()
-
     key = get_chat_topic_key(message)
-
     mode = settings.get(key, {})
-
     text = message.text
-
-    # ================= THAI =================
 
     if mode.get("thai"):
 
         if has_thai(text):
-
             en = translate_text(text, "th", "en")
-
             time.sleep(2)
-
             zh = translate_text(text, "th", "zh-CN")
 
             bot.reply_to(
@@ -219,33 +163,18 @@ def auto_translate(message):
             )
 
         elif has_chinese(text):
-
             th = translate_text(text, "zh-CN", "th")
-
-            bot.reply_to(
-                message,
-                f"🇨🇳 中文 → 🇹🇭 Thai:\n{th}"
-            )
+            bot.reply_to(message, f"🇨🇳 中文 → 🇹🇭 Thai:\n{th}")
 
         elif has_english(text):
-
             th = translate_text(text, "en", "th")
-
-            bot.reply_to(
-                message,
-                f"🇬🇧 English → 🇹🇭 Thai:\n{th}"
-            )
-
-    # ================= VIETNAMESE =================
+            bot.reply_to(message, f"🇬🇧 English → 🇹🇭 Thai:\n{th}")
 
     if mode.get("vi"):
 
         if has_vietnamese(text):
-
             en = translate_text(text, "vi", "en")
-
             time.sleep(2)
-
             zh = translate_text(text, "vi", "zh-CN")
 
             bot.reply_to(
@@ -254,97 +183,58 @@ def auto_translate(message):
             )
 
         elif has_chinese(text):
-
             vi = translate_text(text, "zh-CN", "vi")
-
-            bot.reply_to(
-                message,
-                f"🇨🇳 中文 → 🇻🇳 Vietnamese:\n{vi}"
-            )
+            bot.reply_to(message, f"🇨🇳 中文 → 🇻🇳 Vietnamese:\n{vi}")
 
         elif has_english(text):
-
             vi = translate_text(text, "en", "vi")
-
-            bot.reply_to(
-                message,
-                f"🇬🇧 English → 🇻🇳 Vietnamese:\n{vi}"
-            )
-
-# =========================
-# AUTO TRANSLATE COMMANDS
-# =========================
+            bot.reply_to(message, f"🇬🇧 English → 🇻🇳 Vietnamese:\n{vi}")
 
 @bot.message_handler(commands=["autothai"])
 def autothai(message):
-
-    if not is_admin(message.chat.id, message.from_user.id) and message.from_user.id != OWNER_ID:
+    if not is_admin_or_owner(message):
         return
 
     settings = load_translate_settings()
-
     key = get_chat_topic_key(message)
-
     args = message.text.split()
 
     if len(args) < 2:
         return
 
     if args[1].lower() == "on":
-
         settings[key] = {"thai": True}
-
         save_translate_settings(settings)
-
         bot.reply_to(message, "✅ Auto Thai translation ON")
-
     else:
-
         settings.pop(key, None)
-
         save_translate_settings(settings)
-
         bot.reply_to(message, "❌ Auto Thai translation OFF")
 
 @bot.message_handler(commands=["autovi"])
 def autovi(message):
-
-    if not is_admin(message.chat.id, message.from_user.id) and message.from_user.id != OWNER_ID:
+    if not is_admin_or_owner(message):
         return
 
     settings = load_translate_settings()
-
     key = get_chat_topic_key(message)
-
     args = message.text.split()
 
     if len(args) < 2:
         return
 
     if args[1].lower() == "on":
-
         settings[key] = {"vi": True}
-
         save_translate_settings(settings)
-
         bot.reply_to(message, "✅ Auto Vietnamese translation ON")
-
     else:
-
         settings.pop(key, None)
-
         save_translate_settings(settings)
-
         bot.reply_to(message, "❌ Auto Vietnamese translation OFF")
-
-# =========================
-# TOPIC COMMANDS
-# =========================
 
 @bot.message_handler(commands=["settopic"])
 def settopic(message):
-
-    if not is_admin(message.chat.id, message.from_user.id) and message.from_user.id != OWNER_ID:
+    if not is_admin_or_owner(message):
         return
 
     args = message.text.split()
@@ -358,7 +248,6 @@ def settopic(message):
         return
 
     targets = load_targets()
-
     key = get_chat_topic_key(message)
 
     targets[key] = {
@@ -376,16 +265,13 @@ def settopic(message):
 
 @bot.message_handler(commands=["listtopic"])
 def listtopic(message):
-
-    if not is_admin(message.chat.id, message.from_user.id) and message.from_user.id != OWNER_ID:
+    if not is_admin_or_owner(message):
         return
 
     targets = load_targets()
-
     text = "📋 Topic List\n\n"
 
     for k, v in targets.items():
-
         text += (
             f"Chat: {v['chat_id']}\n"
             f"Topic: {v['topic_id']}\n"
@@ -394,168 +280,95 @@ def listtopic(message):
 
     bot.reply_to(message, text)
 
-@bot.message_handler(commands=["removetopic"])
+@bot.message_handler(commands=["removetopic", "removetoppic"])
 def removetopic(message):
-
-    if not is_admin(message.chat.id, message.from_user.id) and message.from_user.id != OWNER_ID:
+    if not is_admin_or_owner(message):
         return
 
     targets = load_targets()
-
     key = get_chat_topic_key(message)
 
     if key in targets:
-
         del targets[key]
-
         save_targets(targets)
-
         bot.reply_to(message, "✅ Topic removed")
-
-# =========================
-# CLEAR TOPIC
-# =========================
+    else:
+        bot.reply_to(message, "❌ Topic not found")
 
 @bot.message_handler(commands=["clearall"])
 def clearall(message):
-
     if message.from_user.id != OWNER_ID:
-
-        bot.reply_to(
-            message,
-            "❌ Only owner can use this"
-        )
-
+        bot.reply_to(message, "❌ Only owner can use this")
         return
 
     topic_id = getattr(message, "message_thread_id", None)
 
     if not topic_id:
-
-        bot.reply_to(
-            message,
-            "❌ Use inside topic"
-        )
-
+        bot.reply_to(message, "❌ Use inside topic")
         return
 
-    bot.reply_to(
-        message,
-        "🗑 Clearing topic messages..."
-    )
+    status = bot.reply_to(message, "🗑 Clearing topic messages...")
 
     deleted = 0
+    failed = 0
 
-    try:
+    start_id = max(1, message.message_id - DELETE_RANGE)
+    end_id = message.message_id
 
-        for msg_id in range(message.message_id - 5000, message.message_id + 1):
+    for msg_id in range(start_id, end_id + 1):
+        try:
+            bot.delete_message(message.chat.id, msg_id)
+            deleted += 1
+        except:
+            failed += 1
 
-            try:
-
-                bot.delete_message(
-                    message.chat.id,
-                    msg_id
-                )
-
-                deleted += 1
-
-                time.sleep(0.03)
-
-            except:
-                pass
-
-        bot.send_message(
-            message.chat.id,
-            f"✅ Done\nDeleted: {deleted}",
-            message_thread_id=topic_id
-        )
-
-    except Exception as e:
-
-        bot.send_message(
-            message.chat.id,
-            f"❌ Error:\n{e}",
-            message_thread_id=topic_id
-        )
-
-# =========================
-# CLEAR FULL GROUP
-# =========================
+    bot.send_message(
+        message.chat.id,
+        f"✅ Topic clear done\nDeleted: {deleted}\nFailed/Skipped: {failed}",
+        message_thread_id=topic_id
+    )
 
 @bot.message_handler(commands=["clearfull"])
 def clearfull(message):
-
     if message.from_user.id != OWNER_ID:
-
-        bot.reply_to(
-            message,
-            "❌ Only owner can use this"
-        )
-
+        bot.reply_to(message, "❌ Only owner can use this")
         return
 
-    bot.reply_to(
-        message,
-        "🗑 Clearing full group..."
-    )
+    bot.reply_to(message, "🗑 Clearing full group...")
 
     deleted = 0
+    failed = 0
 
-    try:
+    start_id = max(1, message.message_id - DELETE_RANGE)
+    end_id = message.message_id
 
-        for msg_id in range(message.message_id - 5000, message.message_id + 1):
+    for msg_id in range(start_id, end_id + 1):
+        try:
+            bot.delete_message(message.chat.id, msg_id)
+            deleted += 1
+        except:
+            failed += 1
 
-            try:
-
-                bot.delete_message(
-                    message.chat.id,
-                    msg_id
-                )
-
-                deleted += 1
-
-                time.sleep(0.03)
-
-            except:
-                pass
-
-        bot.send_message(
-            message.chat.id,
-            f"✅ FULL GROUP CLEAR DONE\nDeleted: {deleted}"
-        )
-
-    except Exception as e:
-
-        bot.send_message(
-            message.chat.id,
-            f"❌ Error:\n{e}"
-        )
-
-# =========================
-# SEND ALBUM
-# =========================
+    bot.send_message(
+        message.chat.id,
+        f"✅ FULL GROUP CLEAR DONE\nDeleted: {deleted}\nFailed/Skipped: {failed}"
+    )
 
 def send_album(media_group_id):
-
     items = albums[media_group_id]
 
     if not items:
         return
 
     targets = load_targets()
-
     first = items[0]
-
     source_chat_id = first.chat.id
-
     media = []
-
     caption = first.caption if hasattr(first, "caption") else None
 
     for msg in items:
 
         if msg.content_type == "photo":
-
             media.append(
                 InputMediaPhoto(
                     media=msg.photo[-1].file_id,
@@ -564,7 +377,6 @@ def send_album(media_group_id):
             )
 
         elif msg.content_type == "video":
-
             media.append(
                 InputMediaVideo(
                     media=msg.video.file_id,
@@ -578,38 +390,30 @@ def send_album(media_group_id):
             continue
 
         try:
-
             bot.send_media_group(
                 target["chat_id"],
                 media,
                 message_thread_id=target["topic_id"]
             )
-
         except Exception as e:
             print(e)
 
     albums.pop(media_group_id, None)
 
-# =========================
-# MEDIA HANDLER
-# =========================
-
 @bot.message_handler(content_types=["photo", "video"])
 def media_handler(message):
-
     auto_translate(message)
 
     media_group_id = message.media_group_id
 
     if media_group_id:
-
         albums[media_group_id].append(message)
 
         if media_group_id in timers:
             timers[media_group_id].cancel()
 
         timers[media_group_id] = threading.Timer(
-            2.0,
+            ALBUM_DELAY,
             send_album,
             args=[media_group_id]
         )
@@ -617,7 +421,6 @@ def media_handler(message):
         timers[media_group_id].start()
 
     else:
-
         targets = load_targets()
 
         for target in targets.values():
@@ -626,9 +429,7 @@ def media_handler(message):
                 continue
 
             try:
-
                 if message.photo:
-
                     bot.send_photo(
                         target["chat_id"],
                         message.photo[-1].file_id,
@@ -637,7 +438,6 @@ def media_handler(message):
                     )
 
                 elif message.video:
-
                     bot.send_video(
                         target["chat_id"],
                         message.video.file_id,
@@ -648,13 +448,8 @@ def media_handler(message):
             except Exception as e:
                 print(e)
 
-# =========================
-# TEXT HANDLER
-# =========================
-
 @bot.message_handler(func=lambda m: True)
 def text_handler(message):
-
     auto_translate(message)
 
     targets = load_targets()
@@ -665,7 +460,6 @@ def text_handler(message):
             continue
 
         try:
-
             bot.forward_message(
                 target["chat_id"],
                 message.chat.id,
