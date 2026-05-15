@@ -223,6 +223,10 @@ def auto_translate(message):
 
 @bot.message_handler(commands=["del"])
 def delete_forwarded(message):
+    if not is_admin_or_owner(message):
+        bot.reply_to(message, "❌ Only admin or owner can use this command.")
+        return
+
     if not message.reply_to_message:
         bot.reply_to(message, "❌ Reply to the source message then send /del")
         return
