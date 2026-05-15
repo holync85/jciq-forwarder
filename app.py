@@ -6,10 +6,9 @@ import requests
 import telebot
 import threading
 from collections import defaultdict
+from deep_translator import GoogleTranslator
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-
-# 改成你的 Telegram ID
 OWNER_ID = 6527570402
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
@@ -28,33 +27,23 @@ albums = defaultdict(list)
 timers = {}
 
 MESSAGE_LOG_FILE = "message_logs.json"
+TRANSLATE_SETTING_FILE = "translate_settings.json"
 
 HEADERS = {
     "Authorization": f"token {GITHUB_TOKEN}",
     "Accept": "application/vnd.github.v3+json"
 }
 
-
-# =========================
-# GitHub Save / Load
-# =========================
-
 def github_get_file(filename):
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{filename}"
-
     r = requests.get(url, headers=HEADERS)
 
     if r.status_code == 200:
         data = r.json()
-
-        content = base64.b64decode(
-            data["content"]
-        ).decode("utf-8")
-
+        content = base64.b64decode(data["content"]).decode("utf-8")
         return json.loads(content), data["sha"]
 
     return None, None
-
 
 def github_save_file(filename, content):
     old_data, sha = github_get_file(filename)
@@ -75,86 +64,72 @@ def github_save_file(filename, content):
 
     requests.put(url, headers=HEADERS, json=payload)
 
-
-# =========================
-# Targets
-# =========================
-
 def load_targets(group_no):
     data, sha = github_get_file(f"targets_{group_no}.json")
-
-    if data:
-        return data
-
-    return []
-
+    return data if data else []
 
 def save_targets(group_no, targets):
-    github_save_file(
-        f"targets_{group_no}.json",
-        targets
-    )
-
-
-# =========================
-# Message Logs
-# =========================
+    github_save_file(f"targets_{group_no}.json", targets)
 
 def load_message_logs():
     data, sha = github_get_file(MESSAGE_LOG_FILE)
-
-    if data:
-        return data
-
-    return {}
-
+    return data if data else {}
 
 def save_message_logs(data):
     github_save_file(MESSAGE_LOG_FILE, data)
 
-
 def log_sent_message(chat_id, topic_id, message_id):
     logs = load_message_logs()
-
     key = f"{chat_id}:{topic_id}"
 
     if key not in logs:
         logs[key] = []
 
     logs[key].append(message_id)
-
     save_message_logs(logs)
 
+def load_translate_settings():
+    data, sha = github_get_file(TRANSLATE_SETTING_FILE)
+    return data if data else {}
 
-# =========================
-# Permissions
-# =========================
+def save_translate_settings(data):
+    github_save_file(TRANSLATE_SETTING_FILE, data)
+
+def get_chat_topic_key(message):
+    topic_id = getattr(message, "message_thread_id", None)
+    return f"{message.chat.id}:{topic_id}"
+
+def translate_text(text, source, target):
+    try:
+        return GoogleTranslator(source=source, target=target).translate(text)
+    except Exception as e:
+        return f"❌ Translate error: {e}"
+
+def has_thai(text):
+    return any("\u0E00" <= c <= "\u0E7F" for c in text)
+
+def has_chinese(text):
+    return any("\u4e00" <= c <= "\u9fff" for c in text)
+
+def has_english(text):
+    return any("a" <= c.lower() <= "z" for c in text)
+
+def has_vietnamese(text):
+    chars = "ăâđêôơưÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬĐÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴáàảãạăắằẳẵặâấầẩẫậđéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵ"
+    return any(c in chars for c in text)
 
 def is_owner(message):
     return message.from_user.id == OWNER_ID
 
-
 def is_admin(message):
     try:
         admins = bot.get_chat_administrators(message.chat.id)
-
-        admin_ids = [
-            a.user.id for a in admins
-        ]
-
-        return message.from_user.id in admin_ids
-
+        return message.from_user.id in [a.user.id for a in admins]
     except:
         return False
 
-
 def is_admin_or_owner(message):
     return is_admin(message) or is_owner(message)
-
-
-# =========================
-# Get Group Number
-# =========================
 
 def get_group_no(message):
     parts = message.text.split()
@@ -169,36 +144,19 @@ def get_group_no(message):
 
     return group_no
 
-
-# =========================
-# /settopic
-# =========================
-
 @bot.message_handler(commands=["settopic"])
 def settopic(message):
-
     if not is_admin_or_owner(message):
-        bot.reply_to(
-            message,
-            "❌ Only admins or owner can use this command."
-        )
+        bot.reply_to(message, "❌ Only admins or owner can use this command.")
         return
 
     group_no = get_group_no(message)
 
     if not group_no:
-        bot.reply_to(
-            message,
-            "❌ Use:\n/settopic 1\n/settopic 2\n/settopic 3\n/settopic 4"
-        )
+        bot.reply_to(message, "❌ Use: /settopic 1 / 2 / 3 / 4")
         return
 
-    topic_id = getattr(
-        message,
-        "message_thread_id",
-        None
-    )
-
+    topic_id = getattr(message, "message_thread_id", None)
     targets = load_targets(group_no)
 
     new_target = {
@@ -208,98 +166,52 @@ def settopic(message):
 
     if new_target not in targets:
         targets.append(new_target)
-
         save_targets(group_no, targets)
 
     bot.reply_to(
         message,
-        f"✅ Topic added!\n\n"
-        f"Source: {group_no}\n"
-        f"Chat ID: {message.chat.id}\n"
-        f"Topic ID: {topic_id}\n"
-        f"Total targets: {len(targets)}"
+        f"✅ Topic added!\nSource: {group_no}\nChat ID: {message.chat.id}\nTopic ID: {topic_id}\nTotal targets: {len(targets)}"
     )
-
-
-# =========================
-# /listtopic
-# =========================
 
 @bot.message_handler(commands=["listtopic"])
 def listtopic(message):
-
     if not is_admin_or_owner(message):
-        bot.reply_to(
-            message,
-            "❌ Only admins or owner can use this command."
-        )
+        bot.reply_to(message, "❌ Only admins or owner can use this command.")
         return
 
     group_no = get_group_no(message)
 
     if not group_no:
-        bot.reply_to(
-            message,
-            "❌ Use:\n/listtopic 1"
-        )
+        bot.reply_to(message, "❌ Use: /listtopic 1 / 2 / 3 / 4")
         return
 
     targets = load_targets(group_no)
 
     if not targets:
-        bot.reply_to(
-            message,
-            "❌ No topic saved."
-        )
+        bot.reply_to(message, "❌ No topic saved.")
         return
 
     text = f"📌 Saved Topics For Source {group_no}\n\n"
 
     for i, t in enumerate(targets, 1):
-
-        text += (
-            f"{i}.\n"
-            f"Chat ID: {t['chat_id']}\n"
-            f"Topic ID: {t['topic_id']}\n\n"
-        )
+        text += f"{i}.\nChat ID: {t['chat_id']}\nTopic ID: {t['topic_id']}\n\n"
 
     bot.reply_to(message, text)
 
-
-# =========================
-# /removetopic
-# =========================
-
-@bot.message_handler(commands=[
-    "removetopic",
-    "removetoppic"
-])
+@bot.message_handler(commands=["removetopic", "removetoppic"])
 def removetopic(message):
-
     if not is_admin_or_owner(message):
-        bot.reply_to(
-            message,
-            "❌ Only admins or owner can use this command."
-        )
+        bot.reply_to(message, "❌ Only admins or owner can use this command.")
         return
 
     group_no = get_group_no(message)
 
     if not group_no:
-        bot.reply_to(
-            message,
-            "❌ Use:\n/removetopic 1"
-        )
+        bot.reply_to(message, "❌ Use: /removetopic 1 / 2 / 3 / 4")
         return
 
-    topic_id = getattr(
-        message,
-        "message_thread_id",
-        None
-    )
-
+    topic_id = getattr(message, "message_thread_id", None)
     targets = load_targets(group_no)
-
     before = len(targets)
 
     targets = [
@@ -313,75 +225,38 @@ def removetopic(message):
     save_targets(group_no, targets)
 
     if len(targets) < before:
-
-        bot.reply_to(
-            message,
-            f"✅ Topic removed from Source {group_no}."
-        )
-
+        bot.reply_to(message, f"✅ Topic removed from Source {group_no}.")
     else:
-
-        bot.reply_to(
-            message,
-            "❌ Topic not found."
-        )
-
-
-# =========================
-# /clearall
-# Only clear this topic
-# =========================
+        bot.reply_to(message, "❌ Topic not found.")
 
 @bot.message_handler(commands=["clearall"])
 def clearall(message):
-
     if not is_owner(message):
-        bot.reply_to(
-            message,
-            "❌ Only bot owner can use this command."
-        )
+        bot.reply_to(message, "❌ Only bot owner can use this command.")
         return
 
     group_no = get_group_no(message)
 
     if not group_no:
-        bot.reply_to(
-            message,
-            "❌ Use:\n/clearall 1"
-        )
+        bot.reply_to(message, "❌ Use: /clearall 1 / 2 / 3 / 4")
         return
 
-    topic_id = getattr(
-        message,
-        "message_thread_id",
-        None
-    )
-
+    topic_id = getattr(message, "message_thread_id", None)
     logs = load_message_logs()
-
     key = f"{message.chat.id}:{topic_id}"
-
     message_ids = logs.get(key, [])
 
     deleted = 0
 
     for msg_id in message_ids:
-
         try:
-            bot.delete_message(
-                message.chat.id,
-                msg_id
-            )
-
+            bot.delete_message(message.chat.id, msg_id)
             deleted += 1
-
             time.sleep(0.01)
-
         except:
             pass
 
     logs[key] = []
-
     save_message_logs(logs)
 
     bot.send_message(
@@ -390,47 +265,22 @@ def clearall(message):
         message_thread_id=topic_id
     )
 
-
-# =========================
-# /clearfull
-# Delete full group
-# =========================
-
 @bot.message_handler(commands=["clearfull"])
 def clearfull(message):
-
     if not is_owner(message):
-        bot.reply_to(
-            message,
-            "❌ Only bot owner can use this command."
-        )
+        bot.reply_to(message, "❌ Only bot owner can use this command.")
         return
 
     latest_id = message.message_id
-
     deleted = 0
 
-    bot.reply_to(
-        message,
-        "🗑 Clearing full group messages..."
-    )
+    bot.reply_to(message, "🗑 Clearing full group messages...")
 
-    for msg_id in range(
-        latest_id,
-        latest_id - 2000,
-        -1
-    ):
-
+    for msg_id in range(latest_id, latest_id - 1000, -1):
         try:
-            bot.delete_message(
-                message.chat.id,
-                msg_id
-            )
-
+            bot.delete_message(message.chat.id, msg_id)
             deleted += 1
-
             time.sleep(0.01)
-
         except:
             pass
 
@@ -439,23 +289,108 @@ def clearfull(message):
         text=f"✅ Full group clear done.\nDeleted: {deleted}"
     )
 
+@bot.message_handler(commands=["autothai"])
+def autothai(message):
+    if not is_admin_or_owner(message):
+        bot.reply_to(message, "❌ Only admins or owner can use this command.")
+        return
 
-# =========================
-# Forward
-# =========================
+    parts = message.text.split()
+
+    if len(parts) < 2 or parts[1].lower() not in ["on", "off"]:
+        bot.reply_to(message, "Use: /autothai on 或 /autothai off")
+        return
+
+    settings = load_translate_settings()
+    key = get_chat_topic_key(message)
+
+    if key not in settings:
+        settings[key] = {}
+
+    settings[key]["thai"] = parts[1].lower() == "on"
+    save_translate_settings(settings)
+
+    bot.reply_to(message, f"✅ Auto Thai translation: {parts[1].upper()}")
+
+@bot.message_handler(commands=["autovi"])
+def autovi(message):
+    if not is_admin_or_owner(message):
+        bot.reply_to(message, "❌ Only admins or owner can use this command.")
+        return
+
+    parts = message.text.split()
+
+    if len(parts) < 2 or parts[1].lower() not in ["on", "off"]:
+        bot.reply_to(message, "Use: /autovi on 或 /autovi off")
+        return
+
+    settings = load_translate_settings()
+    key = get_chat_topic_key(message)
+
+    if key not in settings:
+        settings[key] = {}
+
+    settings[key]["vi"] = parts[1].lower() == "on"
+    save_translate_settings(settings)
+
+    bot.reply_to(message, f"✅ Auto Vietnamese translation: {parts[1].upper()}")
+
+def auto_translate(message):
+    if not message.text:
+        return
+
+    if message.text.startswith("/"):
+        return
+
+    settings = load_translate_settings()
+    key = get_chat_topic_key(message)
+    mode = settings.get(key, {})
+
+    text = message.text
+
+    if mode.get("thai"):
+        if has_thai(text):
+            en = translate_text(text, "th", "en")
+            zh = translate_text(text, "th", "zh-CN")
+
+            bot.reply_to(
+                message,
+                f"🇹🇭 Thai\n\n🇬🇧 English:\n{en}\n\n🇨🇳 中文:\n{zh}"
+            )
+
+        elif has_chinese(text):
+            th = translate_text(text, "zh-CN", "th")
+            bot.reply_to(message, f"🇨🇳 中文 → 🇹🇭 Thai:\n{th}")
+
+        elif has_english(text):
+            th = translate_text(text, "en", "th")
+            bot.reply_to(message, f"🇬🇧 English → 🇹🇭 Thai:\n{th}")
+
+    if mode.get("vi"):
+        if has_vietnamese(text):
+            en = translate_text(text, "vi", "en")
+            zh = translate_text(text, "vi", "zh-CN")
+
+            bot.reply_to(
+                message,
+                f"🇻🇳 Vietnamese\n\n🇬🇧 English:\n{en}\n\n🇨🇳 中文:\n{zh}"
+            )
+
+        elif has_chinese(text):
+            vi = translate_text(text, "zh-CN", "vi")
+            bot.reply_to(message, f"🇨🇳 中文 → 🇻🇳 Vietnamese:\n{vi}")
+
+        elif has_english(text):
+            vi = translate_text(text, "en", "vi")
+            bot.reply_to(message, f"🇬🇧 English → 🇻🇳 Vietnamese:\n{vi}")
 
 def forward_to_targets(group_no, message_ids):
-
     targets = load_targets(group_no)
-
     source_chat_id = SOURCE_CHAT_IDS[group_no]
 
     for target in targets:
-
         try:
-
             if len(message_ids) == 1:
-
                 sent = bot.forward_message(
                     chat_id=target["chat_id"],
                     from_chat_id=source_chat_id,
@@ -470,7 +405,6 @@ def forward_to_targets(group_no, message_ids):
                 )
 
             else:
-
                 sent_msgs = bot.forward_messages(
                     chat_id=target["chat_id"],
                     from_chat_id=source_chat_id,
@@ -479,7 +413,6 @@ def forward_to_targets(group_no, message_ids):
                 )
 
                 for s in sent_msgs:
-
                     log_sent_message(
                         target["chat_id"],
                         target["topic_id"],
@@ -489,30 +422,13 @@ def forward_to_targets(group_no, message_ids):
         except Exception as e:
             print(e)
 
-
-# =========================
-# Album
-# =========================
-
 def send_album(key):
-
     group_no, media_group_id = key
-
     msgs = albums.pop(key, [])
-
     timers.pop(key, None)
 
     if msgs:
-
-        forward_to_targets(
-            group_no,
-            sorted(msgs)
-        )
-
-
-# =========================
-# Handle Messages
-# =========================
+        forward_to_targets(group_no, sorted(msgs))
 
 @bot.message_handler(content_types=[
     "text",
@@ -524,11 +440,11 @@ def send_album(key):
     "sticker"
 ])
 def handle_message(message):
+    auto_translate(message)
 
     group_no = None
 
     for no, cid in SOURCE_CHAT_IDS.items():
-
         if message.chat.id == cid:
             group_no = no
             break
@@ -537,37 +453,17 @@ def handle_message(message):
         return
 
     if getattr(message, "media_group_id", None):
-
-        key = (
-            group_no,
-            message.media_group_id
-        )
-
-        albums[key].append(
-            message.message_id
-        )
+        key = (group_no, message.media_group_id)
+        albums[key].append(message.message_id)
 
         if key in timers:
             timers[key].cancel()
 
-        timer = threading.Timer(
-            5.0,
-            send_album,
-            args=[key]
-        )
-
+        timer = threading.Timer(5.0, send_album, args=[key])
         timers[key] = timer
-
         timer.start()
-
     else:
-
-        forward_to_targets(
-            group_no,
-            [message.message_id]
-        )
-
+        forward_to_targets(group_no, [message.message_id])
 
 print("Bot running...")
-
 bot.infinity_polling()
