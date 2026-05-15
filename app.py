@@ -1,12 +1,17 @@
 import os
 import json
 import time
+import base64
+import requests
 import telebot
 import threading
 from collections import defaultdict
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 OWNER_ID = 6527570402
+
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+GITHUB_REPO = os.getenv("GITHUB_REPO")
 
 SOURCE_CHAT_IDS = {
     "1": int(os.getenv("SOURCE_CHAT_ID_1")),
@@ -22,30 +27,54 @@ timers = {}
 
 MESSAGE_LOG_FILE = "message_logs.json"
 
-def config_file(group_no):
-    return f"targets_{group_no}.json"
+HEADERS = {
+    "Authorization": f"token {GITHUB_TOKEN}",
+    "Accept": "application/vnd.github.v3+json"
+}
+
+def github_get_file(filename):
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{filename}"
+    r = requests.get(url, headers=HEADERS)
+
+    if r.status_code == 200:
+        data = r.json()
+        content = base64.b64decode(data["content"]).decode("utf-8")
+        return json.loads(content), data["sha"]
+
+    return None, None
+
+def github_save_file(filename, content):
+    old_data, sha = github_get_file(filename)
+
+    encoded = base64.b64encode(
+        json.dumps(content, indent=2).encode()
+    ).decode()
+
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{filename}"
+
+    payload = {
+        "message": f"Update {filename}",
+        "content": encoded
+    }
+
+    if sha:
+        payload["sha"] = sha
+
+    requests.put(url, headers=HEADERS, json=payload)
 
 def load_targets(group_no):
-    try:
-        with open(config_file(group_no), "r") as f:
-            return json.load(f)
-    except:
-        return []
+    data, sha = github_get_file(f"targets_{group_no}.json")
+    return data if data else []
 
 def save_targets(group_no, targets):
-    with open(config_file(group_no), "w") as f:
-        json.dump(targets, f)
+    github_save_file(f"targets_{group_no}.json", targets)
 
 def load_message_logs():
-    try:
-        with open(MESSAGE_LOG_FILE, "r") as f:
-            return json.load(f)
-    except:
-        return {}
+    data, sha = github_get_file(MESSAGE_LOG_FILE)
+    return data if data else {}
 
 def save_message_logs(data):
-    with open(MESSAGE_LOG_FILE, "w") as f:
-        json.dump(data, f)
+    github_save_file(MESSAGE_LOG_FILE, data)
 
 def log_sent_message(chat_id, topic_id, message_id):
     logs = load_message_logs()
@@ -96,7 +125,6 @@ def set_topic(message):
         return
 
     topic_id = getattr(message, "message_thread_id", None)
-
     targets = load_targets(group_no)
 
     new_target = {
@@ -262,7 +290,6 @@ def forward_to_targets(group_no, message_ids):
 
 def send_album(key):
     group_no, media_group_id = key
-
     messages = albums.pop(key, [])
     timers.pop(key, None)
 
@@ -291,21 +318,14 @@ def handle_message(message):
 
     if getattr(message, "media_group_id", None):
         key = (group_no, message.media_group_id)
-
         albums[key].append(message.message_id)
 
         if key in timers:
             timers[key].cancel()
 
-        timer = threading.Timer(
-            5.0,
-            send_album,
-            args=[key]
-        )
-
+        timer = threading.Timer(5.0, send_album, args=[key])
         timers[key] = timer
         timer.start()
-
     else:
         forward_to_targets(group_no, [message.message_id])
 
