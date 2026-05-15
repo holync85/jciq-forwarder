@@ -23,9 +23,10 @@ TRANSLATE_FILE = "translate_settings.json"
 
 albums = defaultdict(list)
 timers = {}
-ALBUM_DELAY = 0.5
+ALBUM_DELAY = 1.0
 
 translate_queue = queue.Queue()
+
 
 def github_get_file(path):
     try:
@@ -37,10 +38,11 @@ def github_get_file(path):
             data = r.json()
             content = base64.b64decode(data["content"]).decode("utf-8")
             return json.loads(content)
-    except:
-        pass
+    except Exception as e:
+        print("GitHub get error:", e)
 
     return {}
+
 
 def github_save_file(path, content_json):
     try:
@@ -69,23 +71,29 @@ def github_save_file(path, content_json):
         requests.put(url, headers=headers, json=payload)
 
     except Exception as e:
-        print(e)
+        print("GitHub save error:", e)
+
 
 def load_targets():
     return github_get_file(CONFIG_FILE)
 
+
 def save_targets(data):
     github_save_file(CONFIG_FILE, data)
+
 
 def load_translate_settings():
     return github_get_file(TRANSLATE_FILE)
 
+
 def save_translate_settings(data):
     github_save_file(TRANSLATE_FILE, data)
+
 
 def get_chat_topic_key(message):
     topic_id = getattr(message, "message_thread_id", 0)
     return f"{message.chat.id}_{topic_id}"
+
 
 def is_admin(chat_id, user_id):
     try:
@@ -94,21 +102,30 @@ def is_admin(chat_id, user_id):
     except:
         return False
 
+
 def is_admin_or_owner(message):
-    return is_admin(message.chat.id, message.from_user.id) or message.from_user.id == OWNER_ID
+    return (
+        is_admin(message.chat.id, message.from_user.id)
+        or message.from_user.id == OWNER_ID
+    )
+
 
 def has_thai(text):
     return any("\u0E00" <= c <= "\u0E7F" for c in text)
 
+
 def has_chinese(text):
     return any("\u4e00" <= c <= "\u9fff" for c in text)
+
 
 def has_english(text):
     return any(c.isalpha() and ord(c) < 128 for c in text)
 
+
 def has_vietnamese(text):
     chars = "ăâđêôơưáàảãạấầẩẫậắằẳẵặéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹỵ"
     return any(c in chars for c in text.lower())
+
 
 def translate_text(text, source, target):
     try:
@@ -116,8 +133,12 @@ def translate_text(text, source, target):
     except Exception as e:
         return f"⚠️ Translate busy:\n{e}"
 
+
 def do_auto_translate(message):
-    if not message.text or message.text.startswith("/"):
+    if not message.text:
+        return
+
+    if message.text.startswith("/"):
         return
 
     settings = load_translate_settings()
@@ -129,10 +150,15 @@ def do_auto_translate(message):
         if has_thai(text):
             en = translate_text(text, "th", "en")
             zh = translate_text(text, "th", "zh-CN")
-            bot.reply_to(message, f"🇹🇭 Thai\n\n🇬🇧 English:\n{en}\n\n🇨🇳 中文:\n{zh}")
+            bot.reply_to(
+                message,
+                f"🇹🇭 Thai\n\n🇬🇧 English:\n{en}\n\n🇨🇳 中文:\n{zh}"
+            )
+
         elif has_chinese(text):
             th = translate_text(text, "zh-CN", "th")
             bot.reply_to(message, f"🇨🇳 中文 → 🇹🇭 Thai:\n{th}")
+
         elif has_english(text):
             th = translate_text(text, "en", "th")
             bot.reply_to(message, f"🇬🇧 English → 🇹🇭 Thai:\n{th}")
@@ -141,33 +167,53 @@ def do_auto_translate(message):
         if has_vietnamese(text):
             en = translate_text(text, "vi", "en")
             zh = translate_text(text, "vi", "zh-CN")
-            bot.reply_to(message, f"🇻🇳 Vietnamese\n\n🇬🇧 English:\n{en}\n\n🇨🇳 中文:\n{zh}")
+            bot.reply_to(
+                message,
+                f"🇻🇳 Vietnamese\n\n🇬🇧 English:\n{en}\n\n🇨🇳 中文:\n{zh}"
+            )
+
         elif has_chinese(text):
             vi = translate_text(text, "zh-CN", "vi")
             bot.reply_to(message, f"🇨🇳 中文 → 🇻🇳 Vietnamese:\n{vi}")
+
         elif has_english(text):
             vi = translate_text(text, "en", "vi")
             bot.reply_to(message, f"🇬🇧 English → 🇻🇳 Vietnamese:\n{vi}")
+
 
 def translate_worker():
     while True:
         msg = translate_queue.get()
         try:
             do_auto_translate(msg)
-            threading.Event().wait(0.8)
         except Exception as e:
-            print(e)
+            print("Translate worker error:", e)
         finally:
             translate_queue.task_done()
 
+
 threading.Thread(target=translate_worker, daemon=True).start()
+
 
 def auto_translate(message):
     translate_queue.put(message)
 
+
+@bot.message_handler(commands=["ping"])
+def ping(message):
+    bot.reply_to(
+        message,
+        f"✅ Bot is working\n"
+        f"Chat ID: {message.chat.id}\n"
+        f"Topic ID: {getattr(message, 'message_thread_id', 0)}\n"
+        f"User ID: {message.from_user.id}"
+    )
+
+
 @bot.message_handler(commands=["autothai"])
 def autothai(message):
     if not is_admin_or_owner(message):
+        bot.reply_to(message, "❌ Only admin or owner can use this.")
         return
 
     args = message.text.split()
@@ -187,9 +233,11 @@ def autothai(message):
         save_translate_settings(settings)
         bot.reply_to(message, "❌ Auto Thai translation OFF")
 
+
 @bot.message_handler(commands=["autovi"])
 def autovi(message):
     if not is_admin_or_owner(message):
+        bot.reply_to(message, "❌ Only admin or owner can use this.")
         return
 
     args = message.text.split()
@@ -209,9 +257,11 @@ def autovi(message):
         save_translate_settings(settings)
         bot.reply_to(message, "❌ Auto Vietnamese translation OFF")
 
+
 @bot.message_handler(commands=["settopic"])
 def settopic(message):
     if not is_admin_or_owner(message):
+        bot.reply_to(message, "❌ Only admin or owner can use this.")
         return
 
     args = message.text.split()
@@ -221,6 +271,7 @@ def settopic(message):
 
     source_key = args[1]
     if source_key not in SOURCE_CHAT_IDS:
+        bot.reply_to(message, "❌ Source must be 1, 2, 3, or 4.")
         return
 
     targets = load_targets()
@@ -236,25 +287,42 @@ def settopic(message):
 
     bot.reply_to(
         message,
-        f"✅ Topic added!\n\nChat ID: {message.chat.id}\nTopic ID: {getattr(message, 'message_thread_id', 0)}\nSource: {source_key}\nTotal: {len(targets)}"
+        f"✅ Topic added!\n\n"
+        f"Chat ID: {message.chat.id}\n"
+        f"Topic ID: {getattr(message, 'message_thread_id', 0)}\n"
+        f"Source: {source_key}\n"
+        f"Total: {len(targets)}"
     )
+
 
 @bot.message_handler(commands=["listtopic"])
 def listtopic(message):
     if not is_admin_or_owner(message):
+        bot.reply_to(message, "❌ Only admin or owner can use this.")
         return
 
     targets = load_targets()
+
+    if not targets:
+        bot.reply_to(message, "❌ No topic saved.")
+        return
+
     text = "📋 Topic List\n\n"
 
-    for k, v in targets.items():
-        text += f"Chat: {v['chat_id']}\nTopic: {v['topic_id']}\nSource: {v['source']}\n\n"
+    for _, v in targets.items():
+        text += (
+            f"Chat: {v['chat_id']}\n"
+            f"Topic: {v['topic_id']}\n"
+            f"Source: {v['source']}\n\n"
+        )
 
     bot.reply_to(message, text)
+
 
 @bot.message_handler(commands=["removetopic", "removetoppic"])
 def removetopic(message):
     if not is_admin_or_owner(message):
+        bot.reply_to(message, "❌ Only admin or owner can use this.")
         return
 
     targets = load_targets()
@@ -266,6 +334,7 @@ def removetopic(message):
         bot.reply_to(message, "✅ Topic removed")
     else:
         bot.reply_to(message, "❌ Topic not found")
+
 
 @bot.message_handler(commands=["clearall"])
 def clearall(message):
@@ -297,6 +366,7 @@ def clearall(message):
         message_thread_id=topic_id
     )
 
+
 @bot.message_handler(commands=["clearfull"])
 def clearfull(message):
     if message.from_user.id != OWNER_ID:
@@ -321,8 +391,10 @@ def clearfull(message):
         f"✅ FULL GROUP CLEAR DONE\nDeleted: {deleted}"
     )
 
+
 def send_album(media_group_id):
     items = albums[media_group_id]
+
     if not items:
         return
 
@@ -359,9 +431,10 @@ def send_album(media_group_id):
                 message_thread_id=target["topic_id"]
             )
         except Exception as e:
-            print(e)
+            print("Album forward error:", e)
 
     albums.pop(media_group_id, None)
+
 
 @bot.message_handler(content_types=["photo", "video"])
 def media_handler(message):
@@ -405,7 +478,8 @@ def media_handler(message):
                         message_thread_id=target["topic_id"]
                     )
             except Exception as e:
-                print(e)
+                print("Media forward error:", e)
+
 
 @bot.message_handler(func=lambda m: True)
 def text_handler(message):
@@ -425,7 +499,8 @@ def text_handler(message):
                 message_thread_id=target["topic_id"]
             )
         except Exception as e:
-            print(e)
+            print("Text forward error:", e)
+
 
 print("Bot running...")
 bot.infinity_polling(skip_pending=True)
