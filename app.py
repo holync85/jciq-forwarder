@@ -32,12 +32,11 @@ DELETE_MAP_FILE = "delete_map.json"
 albums = defaultdict(list)
 timers = {}
 
-# 防止同一组相册重复发送
 sent_albums = set()
 sending_albums = set()
 
 ALBUM_DELAY = 3.0
-DELETE_RANGE = 20
+DELETE_RANGE = 100
 
 
 def github_get_file(path):
@@ -123,6 +122,25 @@ def save_delete_record(source_chat_id, source_msg_id, target_chat_id, target_msg
     })
 
     save_delete_map(data)
+
+
+def get_delete_count(message):
+    args = message.text.split()
+    delete_count = DELETE_RANGE
+
+    if len(args) >= 2:
+        try:
+            delete_count = int(args[1])
+        except:
+            delete_count = DELETE_RANGE
+
+    if delete_count < 1:
+        delete_count = DELETE_RANGE
+
+    if delete_count > 1000:
+        delete_count = 1000
+
+    return delete_count
 
 
 def get_chat_topic_key(message):
@@ -398,18 +416,21 @@ def clearall(message):
         bot.reply_to(message, "❌ Use inside topic")
         return
 
-    bot.reply_to(message, "🗑 Clearing topic messages...")
+    delete_count = get_delete_count(message)
+
+    bot.reply_to(message, f"🗑 Clearing topic messages...\nRange: {delete_count}")
 
     deleted = 0
     failed = 0
 
-    start_id = max(1, message.message_id - DELETE_RANGE)
+    start_id = max(1, message.message_id - delete_count)
     end_id = message.message_id
 
     for msg_id in range(start_id, end_id + 1):
         try:
             bot.delete_message(message.chat.id, msg_id)
             deleted += 1
+            time.sleep(0.03)
         except:
             failed += 1
 
@@ -426,18 +447,21 @@ def clearfull(message):
         bot.reply_to(message, "❌ Only owner can use this")
         return
 
-    bot.reply_to(message, "🗑 Clearing full group...")
+    delete_count = get_delete_count(message)
+
+    bot.reply_to(message, f"🗑 Clearing full group...\nRange: {delete_count}")
 
     deleted = 0
     failed = 0
 
-    start_id = max(1, message.message_id - DELETE_RANGE)
+    start_id = max(1, message.message_id - delete_count)
     end_id = message.message_id
 
     for msg_id in range(start_id, end_id + 1):
         try:
             bot.delete_message(message.chat.id, msg_id)
             deleted += 1
+            time.sleep(0.03)
         except:
             failed += 1
 
@@ -473,7 +497,6 @@ def send_album(media_group_id):
     items = list(unique.values())
     items.sort(key=lambda m: m.message_id)
 
-    # Telegram album 最多 10 个
     items = items[:10]
 
     targets = load_targets()
