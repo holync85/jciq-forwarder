@@ -35,7 +35,7 @@ timers = {}
 sent_albums = set()
 sending_albums = set()
 
-ALBUM_DELAY = 9.0
+ALBUM_DELAY = 15.0
 DELETE_RANGE = 100
 
 
