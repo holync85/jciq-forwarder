@@ -32,7 +32,11 @@ DELETE_MAP_FILE = "delete_map.json"
 albums = defaultdict(list)
 timers = {}
 
-ALBUM_DELAY = 2.0
+# 防止同一组相册重复发送
+sent_albums = set()
+sending_albums = set()
+
+ALBUM_DELAY = 3.0
 DELETE_RANGE = 20
 
 
@@ -444,14 +448,38 @@ def clearfull(message):
 
 
 def send_album(media_group_id):
-    items = albums[media_group_id]
+    if media_group_id in sent_albums:
+        return
+
+    if media_group_id in sending_albums:
+        return
+
+    sending_albums.add(media_group_id)
+
+    items = albums.pop(media_group_id, [])
+
+    if media_group_id in timers:
+        timers.pop(media_group_id, None)
 
     if not items:
+        sending_albums.discard(media_group_id)
         return
+
+    unique = {}
+
+    for msg in items:
+        unique[msg.message_id] = msg
+
+    items = list(unique.values())
+    items.sort(key=lambda m: m.message_id)
+
+    # Telegram album 最多 10 个
+    items = items[:10]
 
     targets = load_targets()
     first = items[0]
     source_chat_id = first.chat.id
+
     media = []
     caption = first.caption if hasattr(first, "caption") else None
 
@@ -471,6 +499,10 @@ def send_album(media_group_id):
                     caption=caption if len(media) == 0 else ""
                 )
             )
+
+    if not media:
+        sending_albums.discard(media_group_id)
+        return
 
     for target in targets.values():
         if SOURCE_CHAT_IDS[target["source"]] != source_chat_id:
@@ -494,7 +526,8 @@ def send_album(media_group_id):
         except Exception as e:
             print(e)
 
-    albums.pop(media_group_id, None)
+    sent_albums.add(media_group_id)
+    sending_albums.discard(media_group_id)
 
 
 @bot.message_handler(content_types=["photo", "video"])
@@ -504,7 +537,16 @@ def media_handler(message):
     media_group_id = message.media_group_id
 
     if media_group_id:
-        albums[media_group_id].append(message)
+        if media_group_id in sent_albums:
+            return
+
+        exists = any(
+            m.message_id == message.message_id
+            for m in albums[media_group_id]
+        )
+
+        if not exists:
+            albums[media_group_id].append(message)
 
         if media_group_id in timers:
             timers[media_group_id].cancel()
