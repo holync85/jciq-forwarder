@@ -34,13 +34,13 @@ timers = {}
 
 sent_albums = set()
 sending_albums = set()
-
 delete_map_lock = threading.Lock()
 
 ALBUM_DELAY = 8.0
 DELETE_RANGE = 100
 DELETE_SLEEP = 0.05
 TRANSLATE_SLEEP = 0.8
+FORWARD_SLEEP = 0.5
 
 
 def github_get_file(path):
@@ -563,6 +563,8 @@ def send_album(album_key):
                     "target_msg_id": sent_msg.message_id
                 })
 
+            time.sleep(FORWARD_SLEEP)
+
         except Exception as e:
             print("Album send error:", e)
 
@@ -634,6 +636,8 @@ def media_handler(message):
                     sent.message_id
                 )
 
+                time.sleep(FORWARD_SLEEP)
+
             except Exception as e:
                 print("Single media send error:", e)
 
@@ -662,6 +666,8 @@ def text_handler(message):
                 sent.chat.id,
                 sent.message_id
             )
+
+            time.sleep(FORWARD_SLEEP)
 
         except Exception as e:
             print("Text forward error:", e)
