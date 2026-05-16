@@ -35,7 +35,7 @@ timers = {}
 sent_albums = set()
 sending_albums = set()
 
-ALBUM_DELAY = 6.0
+ALBUM_DELAY = 4.0
 DELETE_RANGE = 100
 
 
@@ -109,19 +109,33 @@ def save_delete_map(data):
     github_save_file(DELETE_MAP_FILE, data)
 
 
-def save_delete_record(source_chat_id, source_msg_id, target_chat_id, target_msg_id):
+def save_delete_records(records):
+    if not records:
+        return
+
     data = load_delete_map()
-    key = f"{source_chat_id}:{source_msg_id}"
 
-    if key not in data:
-        data[key] = []
+    for r in records:
+        key = f"{r['source_chat_id']}:{r['source_msg_id']}"
 
-    data[key].append({
-        "chat_id": target_chat_id,
-        "message_id": target_msg_id
-    })
+        if key not in data:
+            data[key] = []
+
+        data[key].append({
+            "chat_id": r["target_chat_id"],
+            "message_id": r["target_msg_id"]
+        })
 
     save_delete_map(data)
+
+
+def save_delete_record(source_chat_id, source_msg_id, target_chat_id, target_msg_id):
+    save_delete_records([{
+        "source_chat_id": source_chat_id,
+        "source_msg_id": source_msg_id,
+        "target_chat_id": target_chat_id,
+        "target_msg_id": target_msg_id
+    }])
 
 
 def get_delete_count(message):
@@ -263,7 +277,10 @@ def delete_forwarded(message):
 
     for item in targets:
         try:
-            bot.delete_message(item["chat_id"], item["message_id"])
+            bot.delete_message(
+                item["chat_id"],
+                item["message_id"]
+            )
             deleted += 1
         except:
             failed += 1
@@ -413,7 +430,10 @@ def clearall(message):
 
     delete_count = get_delete_count(message)
 
-    bot.reply_to(message, f"🗑 Clearing topic messages...\nRange: {delete_count}")
+    bot.reply_to(
+        message,
+        f"🗑 Clearing CURRENT topic messages...\nRange: {delete_count}\n\n⚠️ /clearall 3 = delete recent 3 messages, not Topic 3."
+    )
 
     deleted = 0
     failed = 0
@@ -425,7 +445,7 @@ def clearall(message):
         try:
             bot.delete_message(message.chat.id, msg_id)
             deleted += 1
-            time.sleep(0.3)
+            time.sleep(0.03)
         except:
             failed += 1
 
@@ -456,7 +476,7 @@ def clearfull(message):
         try:
             bot.delete_message(message.chat.id, msg_id)
             deleted += 1
-            time.sleep(0.3)
+            time.sleep(0.03)
         except:
             failed += 1
 
@@ -466,22 +486,22 @@ def clearfull(message):
     )
 
 
-def send_album(media_group_id):
-    if media_group_id in sent_albums:
+def send_album(album_key):
+    if album_key in sent_albums:
         return
 
-    if media_group_id in sending_albums:
+    if album_key in sending_albums:
         return
 
-    sending_albums.add(media_group_id)
+    sending_albums.add(album_key)
 
-    items = albums.pop(media_group_id, [])
+    items = albums.pop(album_key, [])
 
-    if media_group_id in timers:
-        timers.pop(media_group_id, None)
+    if album_key in timers:
+        timers.pop(album_key, None)
 
     if not items:
-        sending_albums.discard(media_group_id)
+        sending_albums.discard(album_key)
         return
 
     unique = {}
@@ -491,6 +511,7 @@ def send_album(media_group_id):
 
     items = list(unique.values())
     items.sort(key=lambda m: m.message_id)
+
     items = items[:10]
 
     targets = load_targets()
@@ -518,24 +539,37 @@ def send_album(media_group_id):
             )
 
     if not media:
-        sending_albums.discard(media_group_id)
+        sending_albums.discard(album_key)
         return
+
+    delete_records = []
 
     for target in targets.values():
         if SOURCE_CHAT_IDS[target["source"]] != source_chat_id:
             continue
 
         try:
-            bot.send_media_group(
+            sent_list = bot.send_media_group(
                 target["chat_id"],
                 media,
                 message_thread_id=target["topic_id"]
             )
+
+            for src_msg, sent_msg in zip(items, sent_list):
+                delete_records.append({
+                    "source_chat_id": src_msg.chat.id,
+                    "source_msg_id": src_msg.message_id,
+                    "target_chat_id": sent_msg.chat.id,
+                    "target_msg_id": sent_msg.message_id
+                })
+
         except Exception as e:
             print(e)
 
-    sent_albums.add(media_group_id)
-    sending_albums.discard(media_group_id)
+    save_delete_records(delete_records)
+
+    sent_albums.add(album_key)
+    sending_albums.discard(album_key)
 
 
 @bot.message_handler(content_types=["photo", "video"])
@@ -545,27 +579,29 @@ def media_handler(message):
     media_group_id = message.media_group_id
 
     if media_group_id:
-        if media_group_id in sent_albums:
+        album_key = f"{message.chat.id}:{media_group_id}"
+
+        if album_key in sent_albums:
             return
 
         exists = any(
             m.message_id == message.message_id
-            for m in albums[media_group_id]
+            for m in albums[album_key]
         )
 
         if not exists:
-            albums[media_group_id].append(message)
+            albums[album_key].append(message)
 
-        if media_group_id in timers:
-            timers[media_group_id].cancel()
+        if album_key in timers:
+            timers[album_key].cancel()
 
-        timers[media_group_id] = threading.Timer(
+        timers[album_key] = threading.Timer(
             ALBUM_DELAY,
             send_album,
-            args=[media_group_id]
+            args=[album_key]
         )
 
-        timers[media_group_id].start()
+        timers[album_key].start()
 
     else:
         targets = load_targets()
