@@ -35,8 +35,10 @@ timers = {}
 sent_albums = set()
 sending_albums = set()
 
-ALBUM_DELAY = 15.0
+ALBUM_DELAY = 8.0
 DELETE_RANGE = 100
+DELETE_SLEEP = 1
+TRANSLATE_SLEEP = 0.8
 
 
 def github_get_file(path):
@@ -196,7 +198,7 @@ def has_vietnamese(text):
 
 def translate_text(text, source, target):
     try:
-        time.sleep(0.8)
+        time.sleep(TRANSLATE_SLEEP)
 
         code_map = {
             "th": "th-TH",
@@ -257,8 +259,8 @@ def auto_translate(message):
 
 @bot.message_handler(commands=["del"])
 def delete_forwarded(message):
-    if not is_admin_or_owner(message):
-        bot.reply_to(message, "❌ Only admin or owner can use this command.")
+    if message.from_user.id != OWNER_ID:
+        bot.reply_to(message, "❌ Only owner can use this command.")
         return
 
     if not message.reply_to_message:
@@ -282,6 +284,7 @@ def delete_forwarded(message):
                 item["message_id"]
             )
             deleted += 1
+            time.sleep(DELETE_SLEEP)
         except:
             failed += 1
 
@@ -432,7 +435,7 @@ def clearall(message):
 
     bot.reply_to(
         message,
-        f"🗑 Clearing CURRENT topic messages...\nRange: {delete_count}\n\n⚠️ /clearall 3 = delete recent 3 messages, not Topic 3."
+        f"🗑 Clearing CURRENT topic messages...\nRange: {delete_count}"
     )
 
     deleted = 0
@@ -445,7 +448,7 @@ def clearall(message):
         try:
             bot.delete_message(message.chat.id, msg_id)
             deleted += 1
-            time.sleep(3)
+            time.sleep(DELETE_SLEEP)
         except:
             failed += 1
 
@@ -476,7 +479,7 @@ def clearfull(message):
         try:
             bot.delete_message(message.chat.id, msg_id)
             deleted += 1
-            time.sleep(3)
+            time.sleep(DELETE_SLEEP)
         except:
             failed += 1
 
