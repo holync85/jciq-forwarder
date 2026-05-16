@@ -35,7 +35,7 @@ timers = {}
 sent_albums = set()
 sending_albums = set()
 
-ALBUM_DELAY = 4.0
+ALBUM_DELAY = 6.0
 DELETE_RANGE = 100
 
 
@@ -445,7 +445,7 @@ def clearall(message):
         try:
             bot.delete_message(message.chat.id, msg_id)
             deleted += 1
-            time.sleep(0.03)
+            time.sleep(0.8)
         except:
             failed += 1
 
@@ -476,7 +476,7 @@ def clearfull(message):
         try:
             bot.delete_message(message.chat.id, msg_id)
             deleted += 1
-            time.sleep(0.03)
+            time.sleep(0.8)
         except:
             failed += 1
 
