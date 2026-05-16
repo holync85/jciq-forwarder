@@ -160,7 +160,7 @@ def has_vietnamese(text):
 
 def translate_text(text, source, target):
     try:
-        time.sleep(1.5)
+        time.sleep(1)
 
         code_map = {
             "th": "th-TH",
@@ -193,7 +193,7 @@ def auto_translate(message):
     if mode.get("thai"):
         if has_thai(text):
             en = translate_text(text, "th", "en")
-            time.sleep(2)
+            time.sleep(1)
             zh = translate_text(text, "th", "zh-CN")
             bot.reply_to(message, f"🇹🇭 Thai\n\n🇬🇧 English:\n{en}\n\n🇨🇳 中文:\n{zh}")
 
@@ -208,7 +208,7 @@ def auto_translate(message):
     if mode.get("vi"):
         if has_vietnamese(text):
             en = translate_text(text, "vi", "en")
-            time.sleep(2)
+            time.sleep(1)
             zh = translate_text(text, "vi", "zh-CN")
             bot.reply_to(message, f"🇻🇳 Vietnamese\n\n🇬🇧 English:\n{en}\n\n🇨🇳 中文:\n{zh}")
 
