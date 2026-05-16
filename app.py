@@ -35,7 +35,7 @@ timers = {}
 sent_albums = set()
 sending_albums = set()
 
-ALBUM_DELAY = 15.0
+ALBUM_DELAY = 6.0
 DELETE_RANGE = 100
 
 
@@ -182,7 +182,7 @@ def has_vietnamese(text):
 
 def translate_text(text, source, target):
     try:
-        time.sleep(0.5)
+        time.sleep(0.3)
 
         code_map = {
             "th": "th-TH",
@@ -215,7 +215,6 @@ def auto_translate(message):
     if mode.get("thai"):
         if has_thai(text):
             en = translate_text(text, "th", "en")
-            time.sleep(0.5)
             zh = translate_text(text, "th", "zh-CN")
             bot.reply_to(message, f"🇹🇭 Thai\n\n🇬🇧 English:\n{en}\n\n🇨🇳 中文:\n{zh}")
 
@@ -230,7 +229,6 @@ def auto_translate(message):
     if mode.get("vi"):
         if has_vietnamese(text):
             en = translate_text(text, "vi", "en")
-            time.sleep(0.5)
             zh = translate_text(text, "vi", "zh-CN")
             bot.reply_to(message, f"🇻🇳 Vietnamese\n\n🇬🇧 English:\n{en}\n\n🇨🇳 中文:\n{zh}")
 
@@ -265,10 +263,7 @@ def delete_forwarded(message):
 
     for item in targets:
         try:
-            bot.delete_message(
-                item["chat_id"],
-                item["message_id"]
-            )
+            bot.delete_message(item["chat_id"], item["message_id"])
             deleted += 1
         except:
             failed += 1
@@ -496,7 +491,6 @@ def send_album(media_group_id):
 
     items = list(unique.values())
     items.sort(key=lambda m: m.message_id)
-
     items = items[:10]
 
     targets = load_targets()
@@ -532,20 +526,11 @@ def send_album(media_group_id):
             continue
 
         try:
-            sent_list = bot.send_media_group(
+            bot.send_media_group(
                 target["chat_id"],
                 media,
                 message_thread_id=target["topic_id"]
             )
-
-            for src_msg, sent_msg in zip(items, sent_list):
-                save_delete_record(
-                    src_msg.chat.id,
-                    src_msg.message_id,
-                    sent_msg.chat.id,
-                    sent_msg.message_id
-                )
-
         except Exception as e:
             print(e)
 
