@@ -35,7 +35,7 @@ timers = {}
 sent_albums = set()
 sending_albums = set()
 
-ALBUM_DELAY = 3.0
+ALBUM_DELAY = 15.0
 DELETE_RANGE = 100
 
 
@@ -182,7 +182,7 @@ def has_vietnamese(text):
 
 def translate_text(text, source, target):
     try:
-        time.sleep(1)
+        time.sleep(0.5)
 
         code_map = {
             "th": "th-TH",
@@ -215,7 +215,7 @@ def auto_translate(message):
     if mode.get("thai"):
         if has_thai(text):
             en = translate_text(text, "th", "en")
-            time.sleep(1)
+            time.sleep(0.5)
             zh = translate_text(text, "th", "zh-CN")
             bot.reply_to(message, f"🇹🇭 Thai\n\n🇬🇧 English:\n{en}\n\n🇨🇳 中文:\n{zh}")
 
@@ -230,7 +230,7 @@ def auto_translate(message):
     if mode.get("vi"):
         if has_vietnamese(text):
             en = translate_text(text, "vi", "en")
-            time.sleep(1)
+            time.sleep(0.5)
             zh = translate_text(text, "vi", "zh-CN")
             bot.reply_to(message, f"🇻🇳 Vietnamese\n\n🇬🇧 English:\n{en}\n\n🇨🇳 中文:\n{zh}")
 
@@ -430,7 +430,7 @@ def clearall(message):
         try:
             bot.delete_message(message.chat.id, msg_id)
             deleted += 1
-            time.sleep(0.03)
+            time.sleep(0.3)
         except:
             failed += 1
 
@@ -461,7 +461,7 @@ def clearfull(message):
         try:
             bot.delete_message(message.chat.id, msg_id)
             deleted += 1
-            time.sleep(0.03)
+            time.sleep(0.3)
         except:
             failed += 1
 
