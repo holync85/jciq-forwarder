@@ -35,9 +35,11 @@ timers = {}
 sent_albums = set()
 sending_albums = set()
 
+delete_map_lock = threading.Lock()
+
 ALBUM_DELAY = 8.0
 DELETE_RANGE = 100
-DELETE_SLEEP = 3
+DELETE_SLEEP = 0.05
 TRANSLATE_SLEEP = 0.8
 
 
@@ -51,8 +53,8 @@ def github_get_file(path):
             data = r.json()
             content = base64.b64decode(data["content"]).decode("utf-8")
             return json.loads(content)
-    except:
-        pass
+    except Exception as e:
+        print("GitHub get error:", e)
 
     return {}
 
@@ -84,7 +86,7 @@ def github_save_file(path, content_json):
         requests.put(url, headers=headers, json=payload)
 
     except Exception as e:
-        print(e)
+        print("GitHub save error:", e)
 
 
 def load_targets():
@@ -115,20 +117,21 @@ def save_delete_records(records):
     if not records:
         return
 
-    data = load_delete_map()
+    with delete_map_lock:
+        data = load_delete_map()
 
-    for r in records:
-        key = f"{r['source_chat_id']}:{r['source_msg_id']}"
+        for r in records:
+            key = f"{r['source_chat_id']}:{r['source_msg_id']}"
 
-        if key not in data:
-            data[key] = []
+            if key not in data:
+                data[key] = []
 
-        data[key].append({
-            "chat_id": r["target_chat_id"],
-            "message_id": r["target_msg_id"]
-        })
+            data[key].append({
+                "chat_id": r["target_chat_id"],
+                "message_id": r["target_msg_id"]
+            })
 
-    save_delete_map(data)
+        save_delete_map(data)
 
 
 def save_delete_record(source_chat_id, source_msg_id, target_chat_id, target_msg_id):
@@ -233,11 +236,9 @@ def auto_translate(message):
             en = translate_text(text, "th", "en")
             zh = translate_text(text, "th", "zh-CN")
             bot.reply_to(message, f"🇹🇭 Thai\n\n🇬🇧 English:\n{en}\n\n🇨🇳 中文:\n{zh}")
-
         elif has_chinese(text):
             th = translate_text(text, "zh-CN", "th")
             bot.reply_to(message, f"🇨🇳 中文 → 🇹🇭 Thai:\n{th}")
-
         elif has_english(text):
             th = translate_text(text, "en", "th")
             bot.reply_to(message, f"🇬🇧 English → 🇹🇭 Thai:\n{th}")
@@ -247,11 +248,9 @@ def auto_translate(message):
             en = translate_text(text, "vi", "en")
             zh = translate_text(text, "vi", "zh-CN")
             bot.reply_to(message, f"🇻🇳 Vietnamese\n\n🇬🇧 English:\n{en}\n\n🇨🇳 中文:\n{zh}")
-
         elif has_chinese(text):
             vi = translate_text(text, "zh-CN", "vi")
             bot.reply_to(message, f"🇨🇳 中文 → 🇻🇳 Vietnamese:\n{vi}")
-
         elif has_english(text):
             vi = translate_text(text, "en", "vi")
             bot.reply_to(message, f"🇬🇧 English → 🇻🇳 Vietnamese:\n{vi}")
@@ -270,19 +269,17 @@ def delete_forwarded(message):
     source_chat_id = message.reply_to_message.chat.id
     source_msg_id = message.reply_to_message.message_id
 
-    data = load_delete_map()
-    key = f"{source_chat_id}:{source_msg_id}"
-    targets = data.get(key, [])
+    with delete_map_lock:
+        data = load_delete_map()
+        key = f"{source_chat_id}:{source_msg_id}"
+        targets = data.get(key, [])
 
     deleted = 0
     failed = 0
 
     for item in targets:
         try:
-            bot.delete_message(
-                item["chat_id"],
-                item["message_id"]
-            )
+            bot.delete_message(item["chat_id"], item["message_id"])
             deleted += 1
             time.sleep(DELETE_SLEEP)
         except:
@@ -299,9 +296,13 @@ def delete_forwarded(message):
     except:
         pass
 
-    if key in data:
-        del data[key]
-        save_delete_map(data)
+    with delete_map_lock:
+        data = load_delete_map()
+        key = f"{source_chat_id}:{source_msg_id}"
+
+        if key in data:
+            del data[key]
+            save_delete_map(data)
 
     bot.send_message(
         message.chat.id,
@@ -433,10 +434,7 @@ def clearall(message):
 
     delete_count = get_delete_count(message)
 
-    bot.reply_to(
-        message,
-        f"🗑 Clearing CURRENT topic messages...\nRange: {delete_count}"
-    )
+    bot.reply_to(message, f"🗑 Clearing CURRENT topic messages...\nRange: {delete_count}")
 
     deleted = 0
     failed = 0
@@ -514,7 +512,6 @@ def send_album(album_key):
 
     items = list(unique.values())
     items.sort(key=lambda m: m.message_id)
-
     items = items[:10]
 
     targets = load_targets()
@@ -567,7 +564,7 @@ def send_album(album_key):
                 })
 
         except Exception as e:
-            print(e)
+            print("Album send error:", e)
 
     save_delete_records(delete_records)
 
@@ -638,7 +635,7 @@ def media_handler(message):
                 )
 
             except Exception as e:
-                print(e)
+                print("Single media send error:", e)
 
 
 @bot.message_handler(func=lambda m: True)
@@ -667,7 +664,7 @@ def text_handler(message):
             )
 
         except Exception as e:
-            print(e)
+            print("Text forward error:", e)
 
 
 print("Bot running...")
