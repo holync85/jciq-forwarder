@@ -37,7 +37,7 @@ sending_albums = set()
 
 ALBUM_DELAY = 8.0
 DELETE_RANGE = 100
-DELETE_SLEEP = 0.8
+DELETE_SLEEP = 0.5
 TRANSLATE_SLEEP = 0.8
 
 
