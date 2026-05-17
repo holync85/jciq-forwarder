@@ -38,9 +38,9 @@ delete_map_lock = threading.Lock()
 
 ALBUM_DELAY = 8.0
 DELETE_RANGE = 100
-DELETE_SLEEP = 0.3
-TRANSLATE_SLEEP = 0.5
-FORWARD_SLEEP = 0.3
+DELETE_SLEEP = 0.1
+TRANSLATE_SLEEP = 0.08
+FORWARD_SLEEP = 0.05
 
 
 def github_get_file(path):
