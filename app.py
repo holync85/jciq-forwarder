@@ -36,7 +36,7 @@ sent_albums = set()
 sending_albums = set()
 delete_map_lock = threading.Lock()
 
-ALBUM_DELAY = 8.0
+ALBUM_DELAY = 30.0
 DELETE_RANGE = 100
 DELETE_SLEEP = 0.1
 TRANSLATE_SLEEP = 0.08
