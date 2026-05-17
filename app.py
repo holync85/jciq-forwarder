@@ -28,6 +28,7 @@ bot = telebot.TeleBot(BOT_TOKEN)
 CONFIG_FILE = "targets.json"
 TRANSLATE_FILE = "translate_settings.json"
 DELETE_MAP_FILE = "delete_map.json"
+TOPIC_LOG_FILE = "topic_logs.json"
 
 albums = defaultdict(list)
 timers = {}
@@ -35,10 +36,11 @@ timers = {}
 sent_albums = set()
 sending_albums = set()
 delete_map_lock = threading.Lock()
+topic_log_lock = threading.Lock()
 
 ALBUM_DELAY = 30.0
 DELETE_RANGE = 100
-DELETE_SLEEP = 0.1
+DELETE_SLEEP = 0.05
 TRANSLATE_SLEEP = 0.08
 FORWARD_SLEEP = 0.05
 
@@ -111,6 +113,40 @@ def load_delete_map():
 
 def save_delete_map(data):
     github_save_file(DELETE_MAP_FILE, data)
+
+
+def load_topic_logs():
+    return github_get_file(TOPIC_LOG_FILE)
+
+
+def save_topic_logs(data):
+    github_save_file(TOPIC_LOG_FILE, data)
+
+
+def save_topic_messages(records):
+    if not records:
+        return
+
+    with topic_log_lock:
+        logs = load_topic_logs()
+
+        for r in records:
+            key = f"{r['chat_id']}:{r['topic_id']}"
+
+            if key not in logs:
+                logs[key] = []
+
+            logs[key].append(r["message_id"])
+
+        save_topic_logs(logs)
+
+
+def save_topic_message(chat_id, topic_id, message_id):
+    save_topic_messages([{
+        "chat_id": chat_id,
+        "topic_id": topic_id,
+        "message_id": message_id
+    }])
 
 
 def save_delete_records(records):
@@ -432,17 +468,16 @@ def clearall(message):
         bot.reply_to(message, "❌ Use inside topic")
         return
 
-    delete_count = get_delete_count(message)
-
-    bot.reply_to(message, f"🗑 Clearing CURRENT topic messages...\nRange: {delete_count}")
+    logs = load_topic_logs()
+    key = f"{message.chat.id}:{topic_id}"
+    msg_ids = logs.get(key, [])
 
     deleted = 0
     failed = 0
 
-    start_id = max(1, message.message_id - delete_count)
-    end_id = message.message_id
+    bot.reply_to(message, f"🗑 Clearing CURRENT topic only...\nMessages: {len(msg_ids)}")
 
-    for msg_id in range(start_id, end_id + 1):
+    for msg_id in msg_ids:
         try:
             bot.delete_message(message.chat.id, msg_id)
             deleted += 1
@@ -450,9 +485,12 @@ def clearall(message):
         except:
             failed += 1
 
+    logs[key] = []
+    save_topic_logs(logs)
+
     bot.send_message(
         message.chat.id,
-        f"✅ Topic clear done\nDeleted: {deleted}\nFailed/Skipped: {failed}",
+        f"✅ Current topic cleared only.\nDeleted: {deleted}\nFailed: {failed}",
         message_thread_id=topic_id
     )
 
@@ -543,6 +581,7 @@ def send_album(album_key):
         return
 
     delete_records = []
+    topic_records = []
 
     for target in targets.values():
         if SOURCE_CHAT_IDS[target["source"]] != source_chat_id:
@@ -563,12 +602,19 @@ def send_album(album_key):
                     "target_msg_id": sent_msg.message_id
                 })
 
+                topic_records.append({
+                    "chat_id": sent_msg.chat.id,
+                    "topic_id": target["topic_id"],
+                    "message_id": sent_msg.message_id
+                })
+
             time.sleep(FORWARD_SLEEP)
 
         except Exception as e:
             print("Album send error:", e)
 
     save_delete_records(delete_records)
+    save_topic_messages(topic_records)
 
     sent_albums.add(album_key)
     sending_albums.discard(album_key)
@@ -636,6 +682,12 @@ def media_handler(message):
                     sent.message_id
                 )
 
+                save_topic_message(
+                    sent.chat.id,
+                    target["topic_id"],
+                    sent.message_id
+                )
+
                 time.sleep(FORWARD_SLEEP)
 
             except Exception as e:
@@ -664,6 +716,12 @@ def text_handler(message):
                 message.chat.id,
                 message.message_id,
                 sent.chat.id,
+                sent.message_id
+            )
+
+            save_topic_message(
+                sent.chat.id,
+                target["topic_id"],
                 sent.message_id
             )
 
