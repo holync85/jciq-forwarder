@@ -23,7 +23,7 @@ SOURCE_CHAT_IDS = {
     "4": int(os.getenv("SOURCE_CHAT_ID_4")),
 }
 
-bot = telebot.TeleBot(BOT_TOKEN)
+bot = telebot.TeleBot(BOT_TOKEN, threaded=True, num_threads=50)
 
 CONFIG_FILE = "targets.json"
 TRANSLATE_FILE = "translate_settings.json"
@@ -35,12 +35,13 @@ timers = {}
 
 sent_albums = set()
 sending_albums = set()
+
 delete_map_lock = threading.Lock()
 topic_log_lock = threading.Lock()
 
-ALBUM_DELAY = 30.0
+ALBUM_DELAY = 25.0
 DELETE_RANGE = 100
-DELETE_SLEEP = 0.05
+DELETE_SLEEP = 0.03
 TRANSLATE_SLEEP = 0.08
 FORWARD_SLEEP = 0.05
 
@@ -123,32 +124,6 @@ def save_topic_logs(data):
     github_save_file(TOPIC_LOG_FILE, data)
 
 
-def save_topic_messages(records):
-    if not records:
-        return
-
-    with topic_log_lock:
-        logs = load_topic_logs()
-
-        for r in records:
-            key = f"{r['chat_id']}:{r['topic_id']}"
-
-            if key not in logs:
-                logs[key] = []
-
-            logs[key].append(r["message_id"])
-
-        save_topic_logs(logs)
-
-
-def save_topic_message(chat_id, topic_id, message_id):
-    save_topic_messages([{
-        "chat_id": chat_id,
-        "topic_id": topic_id,
-        "message_id": message_id
-    }])
-
-
 def save_delete_records(records):
     if not records:
         return
@@ -170,12 +145,38 @@ def save_delete_records(records):
         save_delete_map(data)
 
 
+def save_topic_messages(records):
+    if not records:
+        return
+
+    with topic_log_lock:
+        logs = load_topic_logs()
+
+        for r in records:
+            key = f"{r['chat_id']}:{r['topic_id']}"
+
+            if key not in logs:
+                logs[key] = []
+
+            logs[key].append(r["message_id"])
+
+        save_topic_logs(logs)
+
+
 def save_delete_record(source_chat_id, source_msg_id, target_chat_id, target_msg_id):
     save_delete_records([{
         "source_chat_id": source_chat_id,
         "source_msg_id": source_msg_id,
         "target_chat_id": target_chat_id,
         "target_msg_id": target_msg_id
+    }])
+
+
+def save_topic_message(chat_id, topic_id, message_id):
+    save_topic_messages([{
+        "chat_id": chat_id,
+        "topic_id": topic_id,
+        "message_id": message_id
     }])
 
 
@@ -495,6 +496,70 @@ def clearall(message):
     )
 
 
+@bot.message_handler(commands=["clearsource"])
+def clearsource(message):
+    if message.from_user.id != OWNER_ID:
+        bot.reply_to(message, "❌ Only owner can use this")
+        return
+
+    args = message.text.split()
+
+    if len(args) < 2:
+        bot.reply_to(message, "❌ Use: /clearsource 1 或 /clearsource 2 / 3 / 4")
+        return
+
+    source_key = args[1]
+
+    if source_key not in SOURCE_CHAT_IDS:
+        bot.reply_to(message, "❌ Source must be 1, 2, 3, or 4")
+        return
+
+    targets = load_targets()
+    logs = load_topic_logs()
+
+    matched = []
+    deleted = 0
+    failed = 0
+
+    for target_key, target in targets.items():
+        if str(target.get("source")) != str(source_key):
+            continue
+
+        chat_id = target.get("chat_id")
+        topic_id = target.get("topic_id")
+        log_key = f"{chat_id}:{topic_id}"
+
+        msg_ids = logs.get(log_key, [])
+
+        matched.append({
+            "chat_id": chat_id,
+            "topic_id": topic_id,
+            "count": len(msg_ids)
+        })
+
+        for msg_id in msg_ids:
+            try:
+                bot.delete_message(chat_id, msg_id)
+                deleted += 1
+                time.sleep(DELETE_SLEEP)
+            except:
+                failed += 1
+
+        logs[log_key] = []
+
+        time.sleep(FORWARD_SLEEP)
+
+    save_topic_logs(logs)
+
+    bot.reply_to(
+        message,
+        f"✅ Clear source {source_key} done.\n"
+        f"Matched topics: {len(matched)}\n"
+        f"Deleted: {deleted}\n"
+        f"Failed: {failed}"
+    )
+
+
 @bot.message_handler(commands=["clearfull"])
 def clearfull(message):
     if message.from_user.id != OWNER_ID:
@@ -653,6 +718,8 @@ def media_handler(message):
 
     else:
         targets = load_targets()
+        delete_records = []
+        topic_records = []
 
         for target in targets.values():
             if SOURCE_CHAT_IDS[target["source"]] != message.chat.id:
@@ -675,23 +742,26 @@ def media_handler(message):
                         message_thread_id=target["topic_id"]
                     )
 
-                save_delete_record(
-                    message.chat.id,
-                    message.message_id,
-                    sent.chat.id,
-                    sent.message_id
-                )
+                delete_records.append({
+                    "source_chat_id": message.chat.id,
+                    "source_msg_id": message.message_id,
+                    "target_chat_id": sent.chat.id,
+                    "target_msg_id": sent.message_id
+                })
 
-                save_topic_message(
-                    sent.chat.id,
-                    target["topic_id"],
-                    sent.message_id
-                )
+                topic_records.append({
+                    "chat_id": sent.chat.id,
+                    "topic_id": target["topic_id"],
+                    "message_id": sent.message_id
+                })
 
                 time.sleep(FORWARD_SLEEP)
 
             except Exception as e:
                 print("Single media send error:", e)
+
+        save_delete_records(delete_records)
+        save_topic_messages(topic_records)
 
 
 @bot.message_handler(func=lambda m: True)
@@ -699,6 +769,8 @@ def text_handler(message):
     auto_translate(message)
 
     targets = load_targets()
+    delete_records = []
+    topic_records = []
 
     for target in targets.values():
         if SOURCE_CHAT_IDS[target["source"]] != message.chat.id:
@@ -712,23 +784,26 @@ def text_handler(message):
                 message_thread_id=target["topic_id"]
             )
 
-            save_delete_record(
-                message.chat.id,
-                message.message_id,
-                sent.chat.id,
-                sent.message_id
-            )
+            delete_records.append({
+                "source_chat_id": message.chat.id,
+                "source_msg_id": message.message_id,
+                "target_chat_id": sent.chat.id,
+                "target_msg_id": sent.message_id
+            })
 
-            save_topic_message(
-                sent.chat.id,
-                target["topic_id"],
-                sent.message_id
-            )
+            topic_records.append({
+                "chat_id": sent.chat.id,
+                "topic_id": target["topic_id"],
+                "message_id": sent.message_id
+            })
 
             time.sleep(FORWARD_SLEEP)
 
         except Exception as e:
             print("Text forward error:", e)
+
+    save_delete_records(delete_records)
+    save_topic_messages(topic_records)
 
 
 print("Bot running...")
