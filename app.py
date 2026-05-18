@@ -41,9 +41,10 @@ topic_log_lock = threading.Lock()
 
 ALBUM_DELAY = 25.0
 DELETE_RANGE = 100
-DELETE_SLEEP = 0.05
-TRANSLATE_SLEEP = 0.05
-FORWARD_SLEEP = 0.05
+DELETE_SLEEP = 0.03
+TRANSLATE_SLEEP = 0.03
+FORWARD_SLEEP = 0.03
+TRANSLATE_MAX_LENGTH = 450
 
 
 def github_get_file(path):
@@ -56,7 +57,6 @@ def github_get_file(path):
             data = r.json()
             content = base64.b64decode(data["content"]).decode("utf-8")
             return json.loads(content)
-
     except Exception as e:
         print("GitHub get error:", e)
 
@@ -220,6 +220,38 @@ def has_vietnamese(text):
     return any(c in chars for c in text.lower())
 
 
+def split_long_text(text, max_length=450):
+    if len(text) <= max_length:
+        return [text]
+
+    parts = []
+    current = ""
+
+    lines = text.split("\n")
+
+    for line in lines:
+        if len(line) > max_length:
+            if current.strip():
+                parts.append(current.strip())
+                current = ""
+
+            for i in range(0, len(line), max_length):
+                parts.append(line[i:i + max_length])
+
+        elif len(current) + len(line) + 1 <= max_length:
+            current += line + "\n"
+
+        else:
+            if current.strip():
+                parts.append(current.strip())
+            current = line + "\n"
+
+    if current.strip():
+        parts.append(current.strip())
+
+    return parts
+
+
 def translate_text(text, source, target):
     try:
         time.sleep(TRANSLATE_SLEEP)
@@ -231,10 +263,23 @@ def translate_text(text, source, target):
             "zh-CN": "zh-CN"
         }
 
-        return MyMemoryTranslator(
-            source=code_map.get(source, source),
-            target=code_map.get(target, target)
-        ).translate(text)
+        source_lang = code_map.get(source, source)
+        target_lang = code_map.get(target, target)
+
+        parts = split_long_text(text, TRANSLATE_MAX_LENGTH)
+
+        translated_parts = []
+
+        for part in parts:
+            result = MyMemoryTranslator(
+                source=source_lang,
+                target=target_lang
+            ).translate(part)
+
+            translated_parts.append(result)
+            time.sleep(0.3)
+
+        return "\n".join(translated_parts)
 
     except Exception as e:
         return f"⚠️ Translate busy.\n{e}"
