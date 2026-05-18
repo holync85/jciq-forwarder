@@ -41,7 +41,7 @@ topic_log_lock = threading.Lock()
 
 ALBUM_DELAY = 25.0
 DELETE_RANGE = 100
-DELETE_SLEEP = 0.03
+DELETE_SLEEP = 0.05
 TRANSLATE_SLEEP = 0.05
 FORWARD_SLEEP = 0.05
 
@@ -56,6 +56,7 @@ def github_get_file(path):
             data = r.json()
             content = base64.b64decode(data["content"]).decode("utf-8")
             return json.loads(content)
+
     except Exception as e:
         print("GitHub get error:", e)
 
@@ -163,23 +164,6 @@ def save_topic_messages(records):
         save_topic_logs(logs)
 
 
-def save_delete_record(source_chat_id, source_msg_id, target_chat_id, target_msg_id):
-    save_delete_records([{
-        "source_chat_id": source_chat_id,
-        "source_msg_id": source_msg_id,
-        "target_chat_id": target_chat_id,
-        "target_msg_id": target_msg_id
-    }])
-
-
-def save_topic_message(chat_id, topic_id, message_id):
-    save_topic_messages([{
-        "chat_id": chat_id,
-        "topic_id": topic_id,
-        "message_id": message_id
-    }])
-
-
 def get_delete_count(message):
     args = message.text.split()
     delete_count = DELETE_RANGE
@@ -256,6 +240,20 @@ def translate_text(text, source, target):
         return f"⚠️ Translate busy.\n{e}"
 
 
+def translate_to_chinese_better(text, source):
+    en = translate_text(text, source, "en")
+    zh = translate_text(en, "en", "zh-CN")
+    return en, zh
+
+
+def run_auto_translate(message):
+    threading.Thread(
+        target=auto_translate,
+        args=(message,),
+        daemon=True
+    ).start()
+
+
 def auto_translate(message):
     if not message.text:
         return
@@ -270,24 +268,32 @@ def auto_translate(message):
 
     if mode.get("thai"):
         if has_thai(text):
-            en = translate_text(text, "th", "en")
-            zh = translate_text(text, "th", "zh-CN")
-            bot.reply_to(message, f"🇹🇭 Thai\n\n🇬🇧 English:\n{en}\n\n🇨🇳 中文:\n{zh}")
+            en, zh = translate_to_chinese_better(text, "th")
+            bot.reply_to(
+                message,
+                f"🇹🇭 Thai\n\n🇬🇧 English:\n{en}\n\n🇨🇳 中文:\n{zh}"
+            )
+
         elif has_chinese(text):
             th = translate_text(text, "zh-CN", "th")
             bot.reply_to(message, f"🇨🇳 中文 → 🇹🇭 Thai:\n{th}")
+
         elif has_english(text):
             th = translate_text(text, "en", "th")
             bot.reply_to(message, f"🇬🇧 English → 🇹🇭 Thai:\n{th}")
 
     if mode.get("vi"):
         if has_vietnamese(text):
-            en = translate_text(text, "vi", "en")
-            zh = translate_text(text, "vi", "zh-CN")
-            bot.reply_to(message, f"🇻🇳 Vietnamese\n\n🇬🇧 English:\n{en}\n\n🇨🇳 中文:\n{zh}")
+            en, zh = translate_to_chinese_better(text, "vi")
+            bot.reply_to(
+                message,
+                f"🇻🇳 Vietnamese\n\n🇬🇧 English:\n{en}\n\n🇨🇳 中文:\n{zh}"
+            )
+
         elif has_chinese(text):
             vi = translate_text(text, "zh-CN", "vi")
             bot.reply_to(message, f"🇨🇳 中文 → 🇻🇳 Vietnamese:\n{vi}")
+
         elif has_english(text):
             vi = translate_text(text, "en", "vi")
             bot.reply_to(message, f"🇬🇧 English → 🇻🇳 Vietnamese:\n{vi}")
@@ -431,7 +437,7 @@ def listtopic(message):
     targets = load_targets()
     text = "📋 Topic List\n\n"
 
-    for k, v in targets.items():
+    for _, v in targets.items():
         text += (
             f"Chat: {v['chat_id']}\n"
             f"Topic: {v['topic_id']}\n"
@@ -476,7 +482,10 @@ def clearall(message):
     deleted = 0
     failed = 0
 
-    bot.reply_to(message, f"🗑 Clearing CURRENT topic only...\nMessages: {len(msg_ids)}")
+    bot.reply_to(
+        message,
+        f"🗑 Clearing CURRENT topic only...\nMessages: {len(msg_ids)}"
+    )
 
     for msg_id in msg_ids:
         try:
@@ -505,7 +514,7 @@ def clearsource(message):
     args = message.text.split()
 
     if len(args) < 2:
-        bot.reply_to(message, "❌ Use: /clearsource 1 或 /clearsource 2 / 3 / 4")
+        bot.reply_to(message, "❌ Use: /clearsource 1 / 2 / 3 / 4")
         return
 
     source_key = args[1]
@@ -521,7 +530,7 @@ def clearsource(message):
     deleted = 0
     failed = 0
 
-    for target_key, target in targets.items():
+    for _, target in targets.items():
         if str(target.get("source")) != str(source_key):
             continue
 
@@ -546,7 +555,6 @@ def clearsource(message):
                 failed += 1
 
         logs[log_key] = []
-
         time.sleep(FORWARD_SLEEP)
 
     save_topic_logs(logs)
@@ -687,7 +695,7 @@ def send_album(album_key):
 
 @bot.message_handler(content_types=["photo", "video"])
 def media_handler(message):
-    auto_translate(message)
+    run_auto_translate(message)
 
     media_group_id = message.media_group_id
 
@@ -766,7 +774,7 @@ def media_handler(message):
 
 @bot.message_handler(func=lambda m: True)
 def text_handler(message):
-    auto_translate(message)
+    run_auto_translate(message)
 
     targets = load_targets()
     delete_records = []
