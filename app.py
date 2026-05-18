@@ -39,11 +39,11 @@ sending_albums = set()
 delete_map_lock = threading.Lock()
 topic_log_lock = threading.Lock()
 
-ALBUM_DELAY = 4.0
+ALBUM_DELAY = 25.0
 DELETE_RANGE = 100
-DELETE_SLEEP = 0.04
-TRANSLATE_SLEEP = 0.04
-FORWARD_SLEEP = 0.04
+DELETE_SLEEP = 0.05
+TRANSLATE_SLEEP = 0.05
+FORWARD_SLEEP = 0.05
 TRANSLATE_MAX_LENGTH = 450
 
 
@@ -277,7 +277,7 @@ def translate_text(text, source, target):
             ).translate(part)
 
             translated_parts.append(result)
-            time.sleep(0.4)
+            time.sleep(0.5)
 
         return "\n".join(translated_parts)
 
