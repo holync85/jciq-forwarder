@@ -39,11 +39,11 @@ sending_albums = set()
 delete_map_lock = threading.Lock()
 topic_log_lock = threading.Lock()
 
-ALBUM_DELAY = 25.0
+ALBUM_DELAY = 4.0
 DELETE_RANGE = 100
-DELETE_SLEEP = 0.05
-TRANSLATE_SLEEP = 0.05
-FORWARD_SLEEP = 0.05
+DELETE_SLEEP = 0.04
+TRANSLATE_SLEEP = 0.04
+FORWARD_SLEEP = 0.04
 TRANSLATE_MAX_LENGTH = 450
 
 
@@ -57,6 +57,7 @@ def github_get_file(path):
             data = r.json()
             content = base64.b64decode(data["content"]).decode("utf-8")
             return json.loads(content)
+
     except Exception as e:
         print("GitHub get error:", e)
 
@@ -267,7 +268,6 @@ def translate_text(text, source, target):
         target_lang = code_map.get(target, target)
 
         parts = split_long_text(text, TRANSLATE_MAX_LENGTH)
-
         translated_parts = []
 
         for part in parts:
@@ -277,7 +277,7 @@ def translate_text(text, source, target):
             ).translate(part)
 
             translated_parts.append(result)
-            time.sleep(0.5)
+            time.sleep(0.4)
 
         return "\n".join(translated_parts)
 
@@ -668,6 +668,8 @@ def send_album(album_key):
 
     items = list(unique.values())
     items.sort(key=lambda m: m.message_id)
+
+    # Telegram 一个 album 最多 10 个
     items = items[:10]
 
     targets = load_targets()
@@ -675,7 +677,14 @@ def send_album(album_key):
     source_chat_id = first.chat.id
 
     media = []
-    caption = first.caption if hasattr(first, "caption") else None
+
+    # ✅ 修复：caption 不固定在第一张/第一个视频
+    caption = ""
+
+    for x in items:
+        if getattr(x, "caption", None):
+            caption = x.caption
+            break
 
     for msg in items:
         if msg.content_type == "photo":
