@@ -29,6 +29,7 @@ CONFIG_FILE = "targets.json"
 TRANSLATE_FILE = "translate_settings.json"
 DELETE_MAP_FILE = "delete_map.json"
 TOPIC_LOG_FILE = "topic_logs.json"
+ALBUM_MAP_FILE = "album_map.json"
 
 albums = defaultdict(list)
 timers = {}
@@ -38,6 +39,7 @@ sending_albums = set()
 
 delete_map_lock = threading.Lock()
 topic_log_lock = threading.Lock()
+album_map_lock = threading.Lock()
 
 ALBUM_DELAY = 25.0
 DELETE_RANGE = 100
@@ -126,6 +128,14 @@ def save_topic_logs(data):
     github_save_file(TOPIC_LOG_FILE, data)
 
 
+def load_album_map():
+    return github_get_file(ALBUM_MAP_FILE)
+
+
+def save_album_map(data):
+    github_save_file(ALBUM_MAP_FILE, data)
+
+
 def save_delete_records(records):
     if not records:
         return
@@ -163,6 +173,22 @@ def save_topic_messages(records):
             logs[key].append(r["message_id"])
 
         save_topic_logs(logs)
+
+
+def save_album_record(source_chat_id, source_media_group_id, source_message_ids, target_records):
+    with album_map_lock:
+        data = load_album_map()
+
+        key = f"{source_chat_id}:{source_media_group_id}"
+
+        data[key] = {
+            "source_chat_id": source_chat_id,
+            "source_media_group_id": source_media_group_id,
+            "source_message_ids": source_message_ids,
+            "targets": target_records
+        }
+
+        save_album_map(data)
 
 
 def get_delete_count(message):
@@ -395,6 +421,70 @@ def delete_forwarded(message):
     bot.send_message(
         message.chat.id,
         f"✅ Deleted linked messages.\nDeleted: {deleted}\nFailed: {failed}"
+    )
+
+
+@bot.message_handler(commands=["delalbum"])
+def delete_album(message):
+    if message.from_user.id != OWNER_ID:
+        bot.reply_to(message, "❌ Only owner can use this command.")
+        return
+
+    if not message.reply_to_message:
+        bot.reply_to(message, "❌ Reply to any photo/video inside the album then send /delalbum")
+        return
+
+    reply = message.reply_to_message
+    media_group_id = getattr(reply, "media_group_id", None)
+
+    if not media_group_id:
+        bot.reply_to(message, "❌ This message is not an album. Use /del for single message.")
+        return
+
+    source_chat_id = reply.chat.id
+    key = f"{source_chat_id}:{media_group_id}"
+
+    with album_map_lock:
+        data = load_album_map()
+        record = data.get(key)
+
+    if not record:
+        bot.reply_to(message, "❌ Album record not found. Maybe it was sent before /delalbum was added.")
+        return
+
+    deleted = 0
+    failed = 0
+
+    for target in record.get("targets", []):
+        try:
+            bot.delete_message(target["chat_id"], target["message_id"])
+            deleted += 1
+            time.sleep(DELETE_SLEEP)
+        except:
+            failed += 1
+
+    for msg_id in record.get("source_message_ids", []):
+        try:
+            bot.delete_message(source_chat_id, msg_id)
+            deleted += 1
+            time.sleep(DELETE_SLEEP)
+        except:
+            failed += 1
+
+    try:
+        bot.delete_message(message.chat.id, message.message_id)
+    except:
+        pass
+
+    with album_map_lock:
+        data = load_album_map()
+        if key in data:
+            del data[key]
+            save_album_map(data)
+
+    bot.send_message(
+        message.chat.id,
+        f"✅ Album deleted.\nDeleted: {deleted}\nFailed: {failed}"
     )
 
 
@@ -669,16 +759,15 @@ def send_album(album_key):
     items = list(unique.values())
     items.sort(key=lambda m: m.message_id)
 
-    # Telegram 一个 album 最多 10 个
     items = items[:10]
 
     targets = load_targets()
     first = items[0]
     source_chat_id = first.chat.id
+    source_media_group_id = first.media_group_id
 
     media = []
 
-    # ✅ 修复：caption 不固定在第一张/第一个视频
     caption = ""
 
     for x in items:
@@ -709,6 +798,8 @@ def send_album(album_key):
 
     delete_records = []
     topic_records = []
+    album_target_records = []
+    source_message_ids = [m.message_id for m in items]
 
     for target in targets.values():
         if SOURCE_CHAT_IDS[target["source"]] != source_chat_id:
@@ -735,6 +826,11 @@ def send_album(album_key):
                     "message_id": sent_msg.message_id
                 })
 
+                album_target_records.append({
+                    "chat_id": sent_msg.chat.id,
+                    "message_id": sent_msg.message_id
+                })
+
             time.sleep(FORWARD_SLEEP)
 
         except Exception as e:
@@ -742,6 +838,13 @@ def send_album(album_key):
 
     save_delete_records(delete_records)
     save_topic_messages(topic_records)
+
+    save_album_record(
+        source_chat_id,
+        source_media_group_id,
+        source_message_ids,
+        album_target_records
+    )
 
     sent_albums.add(album_key)
     sending_albums.discard(album_key)
