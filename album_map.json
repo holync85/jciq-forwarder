@@ -764,5 +764,13 @@
         "message_id": 130
       }
     ]
+  },
+  "-1003554325263:14234845147083857": {
+    "source_chat_id": -1003554325263,
+    "source_media_group_id": "14234845147083857",
+    "source_message_ids": [
+      24
+    ],
+    "targets": []
   }
 }
