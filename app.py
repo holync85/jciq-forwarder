@@ -5,6 +5,7 @@ import base64
 import requests
 import telebot
 import threading
+import asyncio
 
 from collections import defaultdict
 from telebot.types import InputMediaPhoto, InputMediaVideo
@@ -32,9 +33,27 @@ SOURCE_CHAT_IDS = {
 
 bot = telebot.TeleBot(BOT_TOKEN, threaded=True, num_threads=50)
 
-userbot = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
-userbot.start()
-print("✅ Userbot connected")
+USERBOT_LOOP = asyncio.new_event_loop()
+userbot = TelegramClient(
+    StringSession(STRING_SESSION),
+    API_ID,
+    API_HASH,
+    loop=USERBOT_LOOP
+)
+
+userbot_ready = threading.Event()
+
+
+def start_userbot():
+    asyncio.set_event_loop(USERBOT_LOOP)
+    USERBOT_LOOP.run_until_complete(userbot.start())
+    print("✅ Userbot connected")
+    userbot_ready.set()
+    USERBOT_LOOP.run_forever()
+
+
+threading.Thread(target=start_userbot, daemon=True).start()
+userbot_ready.wait(timeout=30)
 
 CONFIG_FILE = "targets.json"
 TRANSLATE_FILE = "translate_settings.json"
@@ -51,7 +70,6 @@ sending_albums = set()
 delete_map_lock = threading.Lock()
 topic_log_lock = threading.Lock()
 album_map_lock = threading.Lock()
-userbot_lock = threading.Lock()
 
 ALBUM_DELAY = 25.0
 DELETE_RANGE = 100
@@ -61,21 +79,22 @@ FORWARD_SLEEP = 0.05
 TRANSLATE_MAX_LENGTH = 450
 
 
+async def userbot_delete_async(chat_id, message_id):
+    entity = await userbot.get_entity(int(chat_id))
+    await userbot.delete_messages(
+        entity,
+        [int(message_id)],
+        revoke=True
+    )
+
+
 def userbot_delete(chat_id, message_id):
     try:
-        with userbot_lock:
-            entity = userbot.loop.run_until_complete(
-                userbot.get_entity(int(chat_id))
-            )
-
-            userbot.loop.run_until_complete(
-                userbot.delete_messages(
-                    entity,
-                    [int(message_id)],
-                    revoke=True
-                )
-            )
-
+        future = asyncio.run_coroutine_threadsafe(
+            userbot_delete_async(chat_id, message_id),
+            USERBOT_LOOP
+        )
+        future.result(timeout=20)
         print("Userbot delete OK:", chat_id, message_id)
         return True
 
@@ -778,10 +797,20 @@ def send_album(album_key):
 
     for msg in items:
         if msg.content_type == "photo":
-            media.append(InputMediaPhoto(media=msg.photo[-1].file_id, caption=caption if len(media) == 0 else ""))
+            media.append(
+                InputMediaPhoto(
+                    media=msg.photo[-1].file_id,
+                    caption=caption if len(media) == 0 else ""
+                )
+            )
 
         elif msg.content_type == "video":
-            media.append(InputMediaVideo(media=msg.video.file_id, caption=caption if len(media) == 0 else ""))
+            media.append(
+                InputMediaVideo(
+                    media=msg.video.file_id,
+                    caption=caption if len(media) == 0 else ""
+                )
+            )
 
     if not media:
         sending_albums.discard(album_key)
