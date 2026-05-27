@@ -5,12 +5,12 @@ import base64
 import requests
 import telebot
 import threading
-import asyncio
 
 from collections import defaultdict
 from telebot.types import InputMediaPhoto, InputMediaVideo
 from deep_translator import MyMemoryTranslator
-from telethon import TelegramClient
+
+from telethon.sync import TelegramClient
 from telethon.sessions import StringSession
 
 
@@ -33,27 +33,14 @@ SOURCE_CHAT_IDS = {
 
 bot = telebot.TeleBot(BOT_TOKEN, threaded=True, num_threads=50)
 
-USERBOT_LOOP = asyncio.new_event_loop()
 userbot = TelegramClient(
     StringSession(STRING_SESSION),
     API_ID,
-    API_HASH,
-    loop=USERBOT_LOOP
+    API_HASH
 )
 
-userbot_ready = threading.Event()
-
-
-def start_userbot():
-    asyncio.set_event_loop(USERBOT_LOOP)
-    USERBOT_LOOP.run_until_complete(userbot.start())
-    print("✅ Userbot connected")
-    userbot_ready.set()
-    USERBOT_LOOP.run_forever()
-
-
-threading.Thread(target=start_userbot, daemon=True).start()
-userbot_ready.wait(timeout=30)
+userbot.start()
+print("✅ Userbot connected")
 
 CONFIG_FILE = "targets.json"
 TRANSLATE_FILE = "translate_settings.json"
@@ -70,6 +57,7 @@ sending_albums = set()
 delete_map_lock = threading.Lock()
 topic_log_lock = threading.Lock()
 album_map_lock = threading.Lock()
+userbot_lock = threading.Lock()
 
 ALBUM_DELAY = 25.0
 DELETE_RANGE = 100
@@ -79,27 +67,22 @@ FORWARD_SLEEP = 0.05
 TRANSLATE_MAX_LENGTH = 450
 
 
-async def userbot_delete_async(chat_id, message_id):
-    entity = await userbot.get_entity(int(chat_id))
-    await userbot.delete_messages(
-        entity,
-        [int(message_id)],
-        revoke=True
-    )
-
-
 def userbot_delete(chat_id, message_id):
     try:
-        future = asyncio.run_coroutine_threadsafe(
-            userbot_delete_async(chat_id, message_id),
-            USERBOT_LOOP
-        )
-        future.result(timeout=20)
-        print("Userbot delete OK:", chat_id, message_id)
+        with userbot_lock:
+            entity = userbot.get_entity(int(chat_id))
+
+            userbot.delete_messages(
+                entity,
+                [int(message_id)],
+                revoke=True
+            )
+
+        print("✅ Userbot delete OK:", chat_id, message_id)
         return True
 
     except Exception as e:
-        print("Userbot delete error:", chat_id, message_id, e)
+        print("❌ Userbot delete error:", chat_id, message_id, e)
         return False
 
 
@@ -278,7 +261,10 @@ def is_admin(chat_id, user_id):
 
 
 def is_admin_or_owner(message):
-    return is_admin(message.chat.id, message.from_user.id) or message.from_user.id == OWNER_ID
+    return (
+        is_admin(message.chat.id, message.from_user.id)
+        or message.from_user.id == OWNER_ID
+    )
 
 
 def has_thai(text):
