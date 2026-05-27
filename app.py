@@ -5,12 +5,10 @@ import base64
 import requests
 import telebot
 import threading
-import asyncio
 
 from collections import defaultdict
 from telebot.types import InputMediaPhoto, InputMediaVideo
 from deep_translator import MyMemoryTranslator
-
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 
@@ -34,12 +32,7 @@ SOURCE_CHAT_IDS = {
 
 bot = telebot.TeleBot(BOT_TOKEN, threaded=True, num_threads=50)
 
-userbot = TelegramClient(
-    StringSession(STRING_SESSION),
-    API_ID,
-    API_HASH
-)
-
+userbot = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
 userbot.start()
 print("✅ Userbot connected")
 
@@ -71,16 +64,23 @@ TRANSLATE_MAX_LENGTH = 450
 def userbot_delete(chat_id, message_id):
     try:
         with userbot_lock:
+            entity = userbot.loop.run_until_complete(
+                userbot.get_entity(int(chat_id))
+            )
+
             userbot.loop.run_until_complete(
                 userbot.delete_messages(
-                    entity=chat_id,
-                    message_ids=[message_id],
+                    entity,
+                    [int(message_id)],
                     revoke=True
                 )
             )
+
+        print("Userbot delete OK:", chat_id, message_id)
         return True
+
     except Exception as e:
-        print("Userbot delete error:", e)
+        print("Userbot delete error:", chat_id, message_id, e)
         return False
 
 
@@ -259,10 +259,7 @@ def is_admin(chat_id, user_id):
 
 
 def is_admin_or_owner(message):
-    return (
-        is_admin(message.chat.id, message.from_user.id)
-        or message.from_user.id == OWNER_ID
-    )
+    return is_admin(message.chat.id, message.from_user.id) or message.from_user.id == OWNER_ID
 
 
 def has_thai(text):
@@ -288,9 +285,8 @@ def split_long_text(text, max_length=450):
 
     parts = []
     current = ""
-    lines = text.split("\n")
 
-    for line in lines:
+    for line in text.split("\n"):
         if len(line) > max_length:
             if current.strip():
                 parts.append(current.strip())
@@ -633,10 +629,7 @@ def clearall(message):
     deleted = 0
     failed = 0
 
-    bot.reply_to(
-        message,
-        f"🗑 Userbot clearing CURRENT topic only...\nMessages: {len(msg_ids)}"
-    )
+    bot.reply_to(message, f"🗑 Userbot clearing CURRENT topic only...\nMessages: {len(msg_ids)}")
 
     for msg_id in msg_ids:
         if userbot_delete(message.chat.id, msg_id):
@@ -747,10 +740,7 @@ def clearfull(message):
 
 
 def send_album(album_key):
-    if album_key in sent_albums:
-        return
-
-    if album_key in sending_albums:
+    if album_key in sent_albums or album_key in sending_albums:
         return
 
     sending_albums.add(album_key)
@@ -788,20 +778,10 @@ def send_album(album_key):
 
     for msg in items:
         if msg.content_type == "photo":
-            media.append(
-                InputMediaPhoto(
-                    media=msg.photo[-1].file_id,
-                    caption=caption if len(media) == 0 else ""
-                )
-            )
+            media.append(InputMediaPhoto(media=msg.photo[-1].file_id, caption=caption if len(media) == 0 else ""))
 
         elif msg.content_type == "video":
-            media.append(
-                InputMediaVideo(
-                    media=msg.video.file_id,
-                    caption=caption if len(media) == 0 else ""
-                )
-            )
+            media.append(InputMediaVideo(media=msg.video.file_id, caption=caption if len(media) == 0 else ""))
 
     if not media:
         sending_albums.discard(album_key)
@@ -873,10 +853,7 @@ def media_handler(message):
         if album_key in sent_albums:
             return
 
-        exists = any(
-            m.message_id == message.message_id
-            for m in albums[album_key]
-        )
+        exists = any(m.message_id == message.message_id for m in albums[album_key])
 
         if not exists:
             albums[album_key].append(message)
@@ -884,12 +861,7 @@ def media_handler(message):
         if album_key in timers:
             timers[album_key].cancel()
 
-        timers[album_key] = threading.Timer(
-            ALBUM_DELAY,
-            send_album,
-            args=[album_key]
-        )
-
+        timers[album_key] = threading.Timer(ALBUM_DELAY, send_album, args=[album_key])
         timers[album_key].start()
 
     else:
