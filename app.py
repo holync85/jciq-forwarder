@@ -10,19 +10,11 @@ from collections import defaultdict
 from telebot.types import InputMediaPhoto, InputMediaVideo
 from deep_translator import MyMemoryTranslator
 
-from telethon.sync import TelegramClient
-from telethon.sessions import StringSession
-
-
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 OWNER_ID = 6527570402
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 GITHUB_REPO = os.getenv("GITHUB_REPO")
-
-API_ID = int(os.getenv("API_ID"))
-API_HASH = os.getenv("API_HASH")
-STRING_SESSION = os.getenv("STRING_SESSION")
 
 SOURCE_CHAT_IDS = {
     "1": int(os.getenv("SOURCE_CHAT_ID_1")),
@@ -32,15 +24,6 @@ SOURCE_CHAT_IDS = {
 }
 
 bot = telebot.TeleBot(BOT_TOKEN, threaded=True, num_threads=50)
-
-userbot = TelegramClient(
-    StringSession(STRING_SESSION),
-    API_ID,
-    API_HASH
-)
-
-userbot.start()
-print("✅ Userbot connected")
 
 CONFIG_FILE = "targets.json"
 TRANSLATE_FILE = "translate_settings.json"
@@ -57,7 +40,6 @@ sending_albums = set()
 delete_map_lock = threading.Lock()
 topic_log_lock = threading.Lock()
 album_map_lock = threading.Lock()
-userbot_lock = threading.Lock()
 
 ALBUM_DELAY = 25.0
 DELETE_RANGE = 100
@@ -65,25 +47,6 @@ DELETE_SLEEP = 0.05
 TRANSLATE_SLEEP = 0.05
 FORWARD_SLEEP = 0.05
 TRANSLATE_MAX_LENGTH = 450
-
-
-def userbot_delete(chat_id, message_id):
-    try:
-        with userbot_lock:
-            entity = userbot.get_entity(int(chat_id))
-
-            userbot.delete_messages(
-                entity,
-                [int(message_id)],
-                revoke=True
-            )
-
-        print("✅ Userbot delete OK:", chat_id, message_id)
-        return True
-
-    except Exception as e:
-        print("❌ Userbot delete error:", chat_id, message_id, e)
-        return False
 
 
 def github_get_file(path):
@@ -241,8 +204,8 @@ def get_delete_count(message):
     if delete_count < 1:
         delete_count = DELETE_RANGE
 
-    if delete_count > 5000:
-        delete_count = 5000
+    if delete_count > 1000:
+        delete_count = 1000
 
     return delete_count
 
@@ -291,7 +254,9 @@ def split_long_text(text, max_length=450):
     parts = []
     current = ""
 
-    for line in text.split("\n"):
+    lines = text.split("\n")
+
+    for line in lines:
         if len(line) > max_length:
             if current.strip():
                 parts.append(current.strip())
@@ -338,7 +303,7 @@ def translate_text(text, source, target):
             ).translate(part)
 
             translated_parts.append(result)
-            time.sleep(0.5)
+            time.sleep(0.3)
 
         return "\n".join(translated_parts)
 
@@ -375,7 +340,10 @@ def auto_translate(message):
     if mode.get("thai"):
         if has_thai(text):
             en, zh = translate_to_chinese_better(text, "th")
-            bot.reply_to(message, f"🇹🇭 Thai\n\n🇬🇧 English:\n{en}\n\n🇨🇳 中文:\n{zh}")
+            bot.reply_to(
+                message,
+                f"🇹🇭 Thai\n\n🇬🇧 English:\n{en}\n\n🇨🇳 中文:\n{zh}"
+            )
 
         elif has_chinese(text):
             th = translate_text(text, "zh-CN", "th")
@@ -388,7 +356,10 @@ def auto_translate(message):
     if mode.get("vi"):
         if has_vietnamese(text):
             en, zh = translate_to_chinese_better(text, "vi")
-            bot.reply_to(message, f"🇻🇳 Vietnamese\n\n🇬🇧 English:\n{en}\n\n🇨🇳 中文:\n{zh}")
+            bot.reply_to(
+                message,
+                f"🇻🇳 Vietnamese\n\n🇬🇧 English:\n{en}\n\n🇨🇳 中文:\n{zh}"
+            )
 
         elif has_chinese(text):
             vi = translate_text(text, "zh-CN", "vi")
@@ -421,28 +392,35 @@ def delete_forwarded(message):
     failed = 0
 
     for item in targets:
-        if userbot_delete(item["chat_id"], item["message_id"]):
+        try:
+            bot.delete_message(item["chat_id"], item["message_id"])
             deleted += 1
-        else:
+            time.sleep(DELETE_SLEEP)
+        except:
             failed += 1
-        time.sleep(DELETE_SLEEP)
 
-    if userbot_delete(source_chat_id, source_msg_id):
+    try:
+        bot.delete_message(source_chat_id, source_msg_id)
         deleted += 1
-    else:
+    except:
         failed += 1
 
-    userbot_delete(message.chat.id, message.message_id)
+    try:
+        bot.delete_message(message.chat.id, message.message_id)
+    except:
+        pass
 
     with delete_map_lock:
         data = load_delete_map()
+        key = f"{source_chat_id}:{source_msg_id}"
+
         if key in data:
             del data[key]
             save_delete_map(data)
 
     bot.send_message(
         message.chat.id,
-        f"✅ Userbot deleted linked messages.\nDeleted: {deleted}\nFailed: {failed}"
+        f"✅ Deleted linked messages.\nDeleted: {deleted}\nFailed: {failed}"
     )
 
 
@@ -471,27 +449,32 @@ def delete_album(message):
         record = data.get(key)
 
     if not record:
-        bot.reply_to(message, "❌ Album record not found.")
+        bot.reply_to(message, "❌ Album record not found. Maybe it was sent before /delalbum was added.")
         return
 
     deleted = 0
     failed = 0
 
     for target in record.get("targets", []):
-        if userbot_delete(target["chat_id"], target["message_id"]):
+        try:
+            bot.delete_message(target["chat_id"], target["message_id"])
             deleted += 1
-        else:
+            time.sleep(DELETE_SLEEP)
+        except:
             failed += 1
-        time.sleep(DELETE_SLEEP)
 
     for msg_id in record.get("source_message_ids", []):
-        if userbot_delete(source_chat_id, msg_id):
+        try:
+            bot.delete_message(source_chat_id, msg_id)
             deleted += 1
-        else:
+            time.sleep(DELETE_SLEEP)
+        except:
             failed += 1
-        time.sleep(DELETE_SLEEP)
 
-    userbot_delete(message.chat.id, message.message_id)
+    try:
+        bot.delete_message(message.chat.id, message.message_id)
+    except:
+        pass
 
     with album_map_lock:
         data = load_album_map()
@@ -501,7 +484,7 @@ def delete_album(message):
 
     bot.send_message(
         message.chat.id,
-        f"✅ Userbot album deleted.\nDeleted: {deleted}\nFailed: {failed}"
+        f"✅ Album deleted.\nDeleted: {deleted}\nFailed: {failed}"
     )
 
 
@@ -634,21 +617,25 @@ def clearall(message):
     deleted = 0
     failed = 0
 
-    bot.reply_to(message, f"🗑 Userbot clearing CURRENT topic only...\nMessages: {len(msg_ids)}")
+    bot.reply_to(
+        message,
+        f"🗑 Clearing CURRENT topic only...\nMessages: {len(msg_ids)}"
+    )
 
     for msg_id in msg_ids:
-        if userbot_delete(message.chat.id, msg_id):
+        try:
+            bot.delete_message(message.chat.id, msg_id)
             deleted += 1
-        else:
+            time.sleep(DELETE_SLEEP)
+        except:
             failed += 1
-        time.sleep(DELETE_SLEEP)
 
     logs[key] = []
     save_topic_logs(logs)
 
     bot.send_message(
         message.chat.id,
-        f"✅ Userbot current topic cleared.\nDeleted: {deleted}\nFailed: {failed}",
+        f"✅ Current topic cleared only.\nDeleted: {deleted}\nFailed: {failed}",
         message_thread_id=topic_id
     )
 
@@ -695,11 +682,12 @@ def clearsource(message):
         })
 
         for msg_id in msg_ids:
-            if userbot_delete(chat_id, msg_id):
+            try:
+                bot.delete_message(chat_id, msg_id)
                 deleted += 1
-            else:
+                time.sleep(DELETE_SLEEP)
+            except:
                 failed += 1
-            time.sleep(DELETE_SLEEP)
 
         logs[log_key] = []
         time.sleep(FORWARD_SLEEP)
@@ -708,7 +696,7 @@ def clearsource(message):
 
     bot.reply_to(
         message,
-        f"✅ Userbot clear source {source_key} done.\n"
+        f"✅ Clear source {source_key} done.\n"
         f"Matched topics: {len(matched)}\n"
         f"Deleted: {deleted}\n"
         f"Failed: {failed}"
@@ -723,7 +711,7 @@ def clearfull(message):
 
     delete_count = get_delete_count(message)
 
-    bot.reply_to(message, f"🗑 Userbot clearing full group...\nRange: {delete_count}")
+    bot.reply_to(message, f"🗑 Clearing full group...\nRange: {delete_count}")
 
     deleted = 0
     failed = 0
@@ -732,20 +720,24 @@ def clearfull(message):
     end_id = message.message_id
 
     for msg_id in range(start_id, end_id + 1):
-        if userbot_delete(message.chat.id, msg_id):
+        try:
+            bot.delete_message(message.chat.id, msg_id)
             deleted += 1
-        else:
+            time.sleep(DELETE_SLEEP)
+        except:
             failed += 1
-        time.sleep(DELETE_SLEEP)
 
     bot.send_message(
         message.chat.id,
-        f"✅ USERBOT FULL GROUP CLEAR DONE\nDeleted: {deleted}\nFailed/Skipped: {failed}"
+        f"✅ FULL GROUP CLEAR DONE\nDeleted: {deleted}\nFailed/Skipped: {failed}"
     )
 
 
 def send_album(album_key):
-    if album_key in sent_albums or album_key in sending_albums:
+    if album_key in sent_albums:
+        return
+
+    if album_key in sending_albums:
         return
 
     sending_albums.add(album_key)
@@ -766,6 +758,7 @@ def send_album(album_key):
 
     items = list(unique.values())
     items.sort(key=lambda m: m.message_id)
+
     items = items[:10]
 
     targets = load_targets()
@@ -774,6 +767,7 @@ def send_album(album_key):
     source_media_group_id = first.media_group_id
 
     media = []
+
     caption = ""
 
     for x in items:
@@ -868,7 +862,10 @@ def media_handler(message):
         if album_key in sent_albums:
             return
 
-        exists = any(m.message_id == message.message_id for m in albums[album_key])
+        exists = any(
+            m.message_id == message.message_id
+            for m in albums[album_key]
+        )
 
         if not exists:
             albums[album_key].append(message)
@@ -876,7 +873,12 @@ def media_handler(message):
         if album_key in timers:
             timers[album_key].cancel()
 
-        timers[album_key] = threading.Timer(ALBUM_DELAY, send_album, args=[album_key])
+        timers[album_key] = threading.Timer(
+            ALBUM_DELAY,
+            send_album,
+            args=[album_key]
+        )
+
         timers[album_key].start()
 
     else:
@@ -969,6 +971,6 @@ def text_handler(message):
     save_topic_messages(topic_records)
 
 
-print("Bot running with Userbot delete...")
+print("Bot running...")
 
 bot.infinity_polling(skip_pending=True)
