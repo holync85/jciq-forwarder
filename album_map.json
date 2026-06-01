@@ -5410,5 +5410,907 @@
         "message_id": 75
       }
     ]
+  },
+  "-1003949286713:14242312638693369": {
+    "source_chat_id": -1003949286713,
+    "source_media_group_id": "14242312638693369",
+    "source_message_ids": [
+      469,
+      470,
+      471,
+      472,
+      473,
+      474
+    ],
+    "targets": [
+      {
+        "chat_id": -1003930462031,
+        "message_id": 621
+      },
+      {
+        "chat_id": -1003930462031,
+        "message_id": 622
+      },
+      {
+        "chat_id": -1003930462031,
+        "message_id": 623
+      },
+      {
+        "chat_id": -1003930462031,
+        "message_id": 624
+      },
+      {
+        "chat_id": -1003930462031,
+        "message_id": 625
+      },
+      {
+        "chat_id": -1003930462031,
+        "message_id": 626
+      },
+      {
+        "chat_id": -1003946384332,
+        "message_id": 214
+      },
+      {
+        "chat_id": -1003946384332,
+        "message_id": 215
+      },
+      {
+        "chat_id": -1003946384332,
+        "message_id": 216
+      },
+      {
+        "chat_id": -1003946384332,
+        "message_id": 217
+      },
+      {
+        "chat_id": -1003946384332,
+        "message_id": 218
+      },
+      {
+        "chat_id": -1003946384332,
+        "message_id": 219
+      },
+      {
+        "chat_id": -1003750049134,
+        "message_id": 95
+      },
+      {
+        "chat_id": -1003750049134,
+        "message_id": 96
+      },
+      {
+        "chat_id": -1003750049134,
+        "message_id": 97
+      },
+      {
+        "chat_id": -1003750049134,
+        "message_id": 98
+      },
+      {
+        "chat_id": -1003750049134,
+        "message_id": 99
+      },
+      {
+        "chat_id": -1003750049134,
+        "message_id": 100
+      },
+      {
+        "chat_id": -1003887449299,
+        "message_id": 96
+      },
+      {
+        "chat_id": -1003887449299,
+        "message_id": 97
+      },
+      {
+        "chat_id": -1003887449299,
+        "message_id": 98
+      },
+      {
+        "chat_id": -1003887449299,
+        "message_id": 99
+      },
+      {
+        "chat_id": -1003887449299,
+        "message_id": 100
+      },
+      {
+        "chat_id": -1003887449299,
+        "message_id": 101
+      },
+      {
+        "chat_id": -1003792460661,
+        "message_id": 98
+      },
+      {
+        "chat_id": -1003792460661,
+        "message_id": 99
+      },
+      {
+        "chat_id": -1003792460661,
+        "message_id": 100
+      },
+      {
+        "chat_id": -1003792460661,
+        "message_id": 101
+      },
+      {
+        "chat_id": -1003792460661,
+        "message_id": 102
+      },
+      {
+        "chat_id": -1003792460661,
+        "message_id": 103
+      },
+      {
+        "chat_id": -1003924996827,
+        "message_id": 109
+      },
+      {
+        "chat_id": -1003924996827,
+        "message_id": 110
+      },
+      {
+        "chat_id": -1003924996827,
+        "message_id": 111
+      },
+      {
+        "chat_id": -1003924996827,
+        "message_id": 112
+      },
+      {
+        "chat_id": -1003924996827,
+        "message_id": 113
+      },
+      {
+        "chat_id": -1003924996827,
+        "message_id": 114
+      },
+      {
+        "chat_id": -1003554325263,
+        "message_id": 110
+      },
+      {
+        "chat_id": -1003554325263,
+        "message_id": 111
+      },
+      {
+        "chat_id": -1003554325263,
+        "message_id": 112
+      },
+      {
+        "chat_id": -1003554325263,
+        "message_id": 113
+      },
+      {
+        "chat_id": -1003554325263,
+        "message_id": 114
+      },
+      {
+        "chat_id": -1003554325263,
+        "message_id": 115
+      },
+      {
+        "chat_id": -1003887953716,
+        "message_id": 216
+      },
+      {
+        "chat_id": -1003887953716,
+        "message_id": 217
+      },
+      {
+        "chat_id": -1003887953716,
+        "message_id": 218
+      },
+      {
+        "chat_id": -1003887953716,
+        "message_id": 219
+      },
+      {
+        "chat_id": -1003887953716,
+        "message_id": 220
+      },
+      {
+        "chat_id": -1003887953716,
+        "message_id": 221
+      },
+      {
+        "chat_id": -1003994764869,
+        "message_id": 212
+      },
+      {
+        "chat_id": -1003994764869,
+        "message_id": 213
+      },
+      {
+        "chat_id": -1003994764869,
+        "message_id": 214
+      },
+      {
+        "chat_id": -1003994764869,
+        "message_id": 215
+      },
+      {
+        "chat_id": -1003994764869,
+        "message_id": 216
+      },
+      {
+        "chat_id": -1003994764869,
+        "message_id": 217
+      },
+      {
+        "chat_id": -1003938630762,
+        "message_id": 211
+      },
+      {
+        "chat_id": -1003938630762,
+        "message_id": 212
+      },
+      {
+        "chat_id": -1003938630762,
+        "message_id": 213
+      },
+      {
+        "chat_id": -1003938630762,
+        "message_id": 214
+      },
+      {
+        "chat_id": -1003938630762,
+        "message_id": 215
+      },
+      {
+        "chat_id": -1003938630762,
+        "message_id": 216
+      },
+      {
+        "chat_id": -1003787808246,
+        "message_id": 213
+      },
+      {
+        "chat_id": -1003787808246,
+        "message_id": 214
+      },
+      {
+        "chat_id": -1003787808246,
+        "message_id": 215
+      },
+      {
+        "chat_id": -1003787808246,
+        "message_id": 216
+      },
+      {
+        "chat_id": -1003787808246,
+        "message_id": 217
+      },
+      {
+        "chat_id": -1003787808246,
+        "message_id": 218
+      },
+      {
+        "chat_id": -1003933790616,
+        "message_id": 230
+      },
+      {
+        "chat_id": -1003933790616,
+        "message_id": 231
+      },
+      {
+        "chat_id": -1003933790616,
+        "message_id": 232
+      },
+      {
+        "chat_id": -1003933790616,
+        "message_id": 233
+      },
+      {
+        "chat_id": -1003933790616,
+        "message_id": 234
+      },
+      {
+        "chat_id": -1003933790616,
+        "message_id": 235
+      },
+      {
+        "chat_id": -1003845110865,
+        "message_id": 220
+      },
+      {
+        "chat_id": -1003845110865,
+        "message_id": 221
+      },
+      {
+        "chat_id": -1003845110865,
+        "message_id": 222
+      },
+      {
+        "chat_id": -1003845110865,
+        "message_id": 223
+      },
+      {
+        "chat_id": -1003845110865,
+        "message_id": 224
+      },
+      {
+        "chat_id": -1003845110865,
+        "message_id": 225
+      },
+      {
+        "chat_id": -1003907716389,
+        "message_id": 212
+      },
+      {
+        "chat_id": -1003907716389,
+        "message_id": 213
+      },
+      {
+        "chat_id": -1003907716389,
+        "message_id": 214
+      },
+      {
+        "chat_id": -1003907716389,
+        "message_id": 215
+      },
+      {
+        "chat_id": -1003907716389,
+        "message_id": 216
+      },
+      {
+        "chat_id": -1003907716389,
+        "message_id": 217
+      },
+      {
+        "chat_id": -1003608193536,
+        "message_id": 243
+      },
+      {
+        "chat_id": -1003608193536,
+        "message_id": 244
+      },
+      {
+        "chat_id": -1003608193536,
+        "message_id": 245
+      },
+      {
+        "chat_id": -1003608193536,
+        "message_id": 246
+      },
+      {
+        "chat_id": -1003608193536,
+        "message_id": 247
+      },
+      {
+        "chat_id": -1003608193536,
+        "message_id": 248
+      },
+      {
+        "chat_id": -1003837029398,
+        "message_id": 220
+      },
+      {
+        "chat_id": -1003837029398,
+        "message_id": 221
+      },
+      {
+        "chat_id": -1003837029398,
+        "message_id": 222
+      },
+      {
+        "chat_id": -1003837029398,
+        "message_id": 223
+      },
+      {
+        "chat_id": -1003837029398,
+        "message_id": 224
+      },
+      {
+        "chat_id": -1003837029398,
+        "message_id": 225
+      },
+      {
+        "chat_id": -1003991674217,
+        "message_id": 208
+      },
+      {
+        "chat_id": -1003991674217,
+        "message_id": 209
+      },
+      {
+        "chat_id": -1003991674217,
+        "message_id": 210
+      },
+      {
+        "chat_id": -1003991674217,
+        "message_id": 211
+      },
+      {
+        "chat_id": -1003991674217,
+        "message_id": 212
+      },
+      {
+        "chat_id": -1003991674217,
+        "message_id": 213
+      },
+      {
+        "chat_id": -1003948301965,
+        "message_id": 348
+      },
+      {
+        "chat_id": -1003948301965,
+        "message_id": 349
+      },
+      {
+        "chat_id": -1003948301965,
+        "message_id": 350
+      },
+      {
+        "chat_id": -1003948301965,
+        "message_id": 351
+      },
+      {
+        "chat_id": -1003948301965,
+        "message_id": 352
+      },
+      {
+        "chat_id": -1003948301965,
+        "message_id": 353
+      },
+      {
+        "chat_id": -1003945409450,
+        "message_id": 351
+      },
+      {
+        "chat_id": -1003945409450,
+        "message_id": 352
+      },
+      {
+        "chat_id": -1003945409450,
+        "message_id": 353
+      },
+      {
+        "chat_id": -1003945409450,
+        "message_id": 354
+      },
+      {
+        "chat_id": -1003945409450,
+        "message_id": 355
+      },
+      {
+        "chat_id": -1003945409450,
+        "message_id": 356
+      },
+      {
+        "chat_id": -1003402038107,
+        "message_id": 198
+      },
+      {
+        "chat_id": -1003402038107,
+        "message_id": 199
+      },
+      {
+        "chat_id": -1003402038107,
+        "message_id": 200
+      },
+      {
+        "chat_id": -1003402038107,
+        "message_id": 201
+      },
+      {
+        "chat_id": -1003402038107,
+        "message_id": 202
+      },
+      {
+        "chat_id": -1003402038107,
+        "message_id": 203
+      },
+      {
+        "chat_id": -1003954354786,
+        "message_id": 197
+      },
+      {
+        "chat_id": -1003954354786,
+        "message_id": 198
+      },
+      {
+        "chat_id": -1003954354786,
+        "message_id": 199
+      },
+      {
+        "chat_id": -1003954354786,
+        "message_id": 200
+      },
+      {
+        "chat_id": -1003954354786,
+        "message_id": 201
+      },
+      {
+        "chat_id": -1003954354786,
+        "message_id": 202
+      },
+      {
+        "chat_id": -1003988173282,
+        "message_id": 195
+      },
+      {
+        "chat_id": -1003988173282,
+        "message_id": 196
+      },
+      {
+        "chat_id": -1003988173282,
+        "message_id": 197
+      },
+      {
+        "chat_id": -1003988173282,
+        "message_id": 198
+      },
+      {
+        "chat_id": -1003988173282,
+        "message_id": 199
+      },
+      {
+        "chat_id": -1003988173282,
+        "message_id": 200
+      },
+      {
+        "chat_id": -1003652851378,
+        "message_id": 201
+      },
+      {
+        "chat_id": -1003652851378,
+        "message_id": 202
+      },
+      {
+        "chat_id": -1003652851378,
+        "message_id": 203
+      },
+      {
+        "chat_id": -1003652851378,
+        "message_id": 204
+      },
+      {
+        "chat_id": -1003652851378,
+        "message_id": 205
+      },
+      {
+        "chat_id": -1003652851378,
+        "message_id": 206
+      },
+      {
+        "chat_id": -1003998962651,
+        "message_id": 204
+      },
+      {
+        "chat_id": -1003998962651,
+        "message_id": 205
+      },
+      {
+        "chat_id": -1003998962651,
+        "message_id": 206
+      },
+      {
+        "chat_id": -1003998962651,
+        "message_id": 207
+      },
+      {
+        "chat_id": -1003998962651,
+        "message_id": 208
+      },
+      {
+        "chat_id": -1003998962651,
+        "message_id": 209
+      },
+      {
+        "chat_id": -1003831996735,
+        "message_id": 220
+      },
+      {
+        "chat_id": -1003831996735,
+        "message_id": 221
+      },
+      {
+        "chat_id": -1003831996735,
+        "message_id": 222
+      },
+      {
+        "chat_id": -1003831996735,
+        "message_id": 223
+      },
+      {
+        "chat_id": -1003831996735,
+        "message_id": 224
+      },
+      {
+        "chat_id": -1003831996735,
+        "message_id": 225
+      },
+      {
+        "chat_id": -1003991670990,
+        "message_id": 319
+      },
+      {
+        "chat_id": -1003991670990,
+        "message_id": 320
+      },
+      {
+        "chat_id": -1003991670990,
+        "message_id": 321
+      },
+      {
+        "chat_id": -1003991670990,
+        "message_id": 322
+      },
+      {
+        "chat_id": -1003991670990,
+        "message_id": 323
+      },
+      {
+        "chat_id": -1003991670990,
+        "message_id": 324
+      },
+      {
+        "chat_id": -1003944829679,
+        "message_id": 323
+      },
+      {
+        "chat_id": -1003944829679,
+        "message_id": 324
+      },
+      {
+        "chat_id": -1003944829679,
+        "message_id": 325
+      },
+      {
+        "chat_id": -1003944829679,
+        "message_id": 326
+      },
+      {
+        "chat_id": -1003944829679,
+        "message_id": 327
+      },
+      {
+        "chat_id": -1003944829679,
+        "message_id": 328
+      },
+      {
+        "chat_id": -1003995673924,
+        "message_id": 330
+      },
+      {
+        "chat_id": -1003995673924,
+        "message_id": 331
+      },
+      {
+        "chat_id": -1003995673924,
+        "message_id": 332
+      },
+      {
+        "chat_id": -1003995673924,
+        "message_id": 333
+      },
+      {
+        "chat_id": -1003995673924,
+        "message_id": 334
+      },
+      {
+        "chat_id": -1003995673924,
+        "message_id": 335
+      },
+      {
+        "chat_id": -1003900033091,
+        "message_id": 322
+      },
+      {
+        "chat_id": -1003900033091,
+        "message_id": 323
+      },
+      {
+        "chat_id": -1003900033091,
+        "message_id": 324
+      },
+      {
+        "chat_id": -1003900033091,
+        "message_id": 325
+      },
+      {
+        "chat_id": -1003900033091,
+        "message_id": 326
+      },
+      {
+        "chat_id": -1003900033091,
+        "message_id": 327
+      },
+      {
+        "chat_id": -1003816067343,
+        "message_id": 348
+      },
+      {
+        "chat_id": -1003816067343,
+        "message_id": 349
+      },
+      {
+        "chat_id": -1003816067343,
+        "message_id": 350
+      },
+      {
+        "chat_id": -1003816067343,
+        "message_id": 351
+      },
+      {
+        "chat_id": -1003816067343,
+        "message_id": 352
+      },
+      {
+        "chat_id": -1003816067343,
+        "message_id": 353
+      },
+      {
+        "chat_id": -1003897284297,
+        "message_id": 326
+      },
+      {
+        "chat_id": -1003897284297,
+        "message_id": 327
+      },
+      {
+        "chat_id": -1003897284297,
+        "message_id": 328
+      },
+      {
+        "chat_id": -1003897284297,
+        "message_id": 329
+      },
+      {
+        "chat_id": -1003897284297,
+        "message_id": 330
+      },
+      {
+        "chat_id": -1003897284297,
+        "message_id": 331
+      },
+      {
+        "chat_id": -1003965144982,
+        "message_id": 312
+      },
+      {
+        "chat_id": -1003965144982,
+        "message_id": 313
+      },
+      {
+        "chat_id": -1003965144982,
+        "message_id": 314
+      },
+      {
+        "chat_id": -1003965144982,
+        "message_id": 315
+      },
+      {
+        "chat_id": -1003965144982,
+        "message_id": 316
+      },
+      {
+        "chat_id": -1003965144982,
+        "message_id": 317
+      },
+      {
+        "chat_id": -1003708874862,
+        "message_id": 337
+      },
+      {
+        "chat_id": -1003708874862,
+        "message_id": 338
+      },
+      {
+        "chat_id": -1003708874862,
+        "message_id": 339
+      },
+      {
+        "chat_id": -1003708874862,
+        "message_id": 340
+      },
+      {
+        "chat_id": -1003708874862,
+        "message_id": 341
+      },
+      {
+        "chat_id": -1003708874862,
+        "message_id": 342
+      },
+      {
+        "chat_id": -1003809344788,
+        "message_id": 352
+      },
+      {
+        "chat_id": -1003809344788,
+        "message_id": 353
+      },
+      {
+        "chat_id": -1003809344788,
+        "message_id": 354
+      },
+      {
+        "chat_id": -1003809344788,
+        "message_id": 355
+      },
+      {
+        "chat_id": -1003809344788,
+        "message_id": 356
+      },
+      {
+        "chat_id": -1003809344788,
+        "message_id": 357
+      },
+      {
+        "chat_id": -1003791399318,
+        "message_id": 344
+      },
+      {
+        "chat_id": -1003791399318,
+        "message_id": 345
+      },
+      {
+        "chat_id": -1003791399318,
+        "message_id": 346
+      },
+      {
+        "chat_id": -1003791399318,
+        "message_id": 347
+      },
+      {
+        "chat_id": -1003791399318,
+        "message_id": 348
+      },
+      {
+        "chat_id": -1003791399318,
+        "message_id": 349
+      },
+      {
+        "chat_id": -1003912642497,
+        "message_id": 474
+      },
+      {
+        "chat_id": -1003912642497,
+        "message_id": 475
+      },
+      {
+        "chat_id": -1003912642497,
+        "message_id": 476
+      },
+      {
+        "chat_id": -1003912642497,
+        "message_id": 477
+      },
+      {
+        "chat_id": -1003912642497,
+        "message_id": 478
+      },
+      {
+        "chat_id": -1003912642497,
+        "message_id": 479
+      },
+      {
+        "chat_id": -1003961025476,
+        "message_id": 76
+      },
+      {
+        "chat_id": -1003961025476,
+        "message_id": 77
+      },
+      {
+        "chat_id": -1003961025476,
+        "message_id": 78
+      },
+      {
+        "chat_id": -1003961025476,
+        "message_id": 79
+      },
+      {
+        "chat_id": -1003961025476,
+        "message_id": 80
+      },
+      {
+        "chat_id": -1003961025476,
+        "message_id": 81
+      }
+    ]
   }
 }
