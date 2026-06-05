@@ -22703,5 +22703,14 @@
         "message_id": 172
       }
     ]
+  },
+  "-1003965987377:14245162636823625": {
+    "source_chat_id": -1003965987377,
+    "source_media_group_id": "14245162636823625",
+    "source_message_ids": [
+      13,
+      14
+    ],
+    "targets": []
   }
 }
