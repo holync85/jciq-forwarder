@@ -852,6 +852,10 @@ def send_album(album_key):
 
 @bot.message_handler(content_types=["photo", "video"])
 def media_handler(message):
+    # Do not forward command captions, e.g. /tdel, /tdelalbum
+    if message.caption and message.caption.strip().startswith("/"):
+        return
+
     run_auto_translate(message)
 
     media_group_id = message.media_group_id
@@ -931,6 +935,10 @@ def media_handler(message):
 
 @bot.message_handler(func=lambda m: True)
 def text_handler(message):
+    # Do not forward commands, e.g. /tdel, /tdelalbum, /clearall
+    if message.text and message.text.strip().startswith("/"):
+        return
+
     run_auto_translate(message)
 
     targets = load_targets()
