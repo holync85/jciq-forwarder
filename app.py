@@ -48,6 +48,73 @@ TRANSLATE_SLEEP = 0.05
 FORWARD_SLEEP = 0.05
 TRANSLATE_MAX_LENGTH = 450
 
+IGNORE_FORWARD_PREFIXES = (
+    "/tdel",
+    "/tdelalbum",
+    "/tclearall",
+    "/tclearfull",
+    "/usource",
+    "/listtopic",
+    "/udelete",
+    "/uclearall",
+    "/del",
+    "/delalbum",
+    "/clearall",
+    "/clearfull",
+    "/clearsource",
+    "/settopic",
+    "/listtopic",
+    "/removetopic",
+    "/removetoppic",
+    "/autothai",
+    "/autovi",
+)
+
+IGNORE_FORWARD_KEYWORDS = (
+    "TDEL LINKED DONE",
+    "TDEL DONE",
+    "TDELALBUM DONE",
+    "TOPIC DEL DONE",
+    "TOPIC ALBUM DELETE DONE",
+    "TOPIC CLEARALL DONE",
+    "TOPIC CLEARFULL DONE",
+    "SOURCE ",
+    "USERBOT DELETE DONE",
+    "USERBOT CLEARALL DONE",
+    "UCLEARALL DONE",
+    "Deleted linked messages",
+    "Album deleted",
+    "Current topic cleared",
+    "FULL GROUP CLEAR DONE",
+    "Clear source",
+    "Deleted:",
+    "Failed:",
+    "Linked targets:",
+    "Checked topics:",
+)
+
+
+def should_ignore_forward(message):
+    text = (getattr(message, "text", None) or getattr(message, "caption", None) or "").strip()
+
+    if not text:
+        return False
+
+    lower_text = text.lower()
+
+    if lower_text.startswith("/"):
+        return True
+
+    for prefix in IGNORE_FORWARD_PREFIXES:
+        if lower_text.startswith(prefix.lower()):
+            return True
+
+    for word in IGNORE_FORWARD_KEYWORDS:
+        if word.lower() in lower_text:
+            return True
+
+    return False
+
 
 def github_get_file(path):
     try:
@@ -852,8 +919,7 @@ def send_album(album_key):
 
 @bot.message_handler(content_types=["photo", "video"])
 def media_handler(message):
-    # Do not forward command captions, e.g. /tdel, /tdelalbum
-    if message.caption and message.caption.strip().startswith("/"):
+    if should_ignore_forward(message):
         return
 
     run_auto_translate(message)
@@ -935,8 +1001,7 @@ def media_handler(message):
 
 @bot.message_handler(func=lambda m: True)
 def text_handler(message):
-    # Do not forward commands, e.g. /tdel, /tdelalbum, /clearall
-    if message.text and message.text.strip().startswith("/"):
+    if should_ignore_forward(message):
         return
 
     run_auto_translate(message)
