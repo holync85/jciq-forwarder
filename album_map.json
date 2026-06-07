@@ -21183,5 +21183,14 @@
         "message_id": 196
       }
     ]
+  },
+  "-1003916589800:14246445243066321": {
+    "source_chat_id": -1003916589800,
+    "source_media_group_id": "14246445243066321",
+    "source_message_ids": [
+      21,
+      22
+    ],
+    "targets": []
   }
 }
