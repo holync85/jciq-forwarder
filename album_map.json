@@ -25111,5 +25111,14 @@
         "message_id": 120
       }
     ]
+  },
+  "-1003294820533:14248563301671741": {
+    "source_chat_id": -1003294820533,
+    "source_media_group_id": "14248563301671741",
+    "source_message_ids": [
+      48,
+      49
+    ],
+    "targets": []
   }
 }
