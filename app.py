@@ -774,7 +774,7 @@ def testtranslate(message):
     if result:
         bot.reply_to(message, f"✅ Test Translate OK:\n{result}")
     else:
-        bot.reply_to(message, "❌ Test Translate failed. Check Render logs / Google JSON / billing.")
+        bot.reply_to(message, f"❌ Error:\n{str(e)}")
 
 
 @bot.message_handler(commands=["settopic"])
