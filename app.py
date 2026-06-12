@@ -748,6 +748,35 @@ def autovi(message):
         bot.reply_to(message, "❌ Auto Vietnamese translation OFF")
 
 
+
+
+@bot.message_handler(commands=["checkgoogle"])
+def checkgoogle(message):
+    if message.from_user.id != OWNER_ID:
+        return
+
+    if translate_client and translate_parent:
+        bot.reply_to(message, "✅ Google Translate connected")
+    else:
+        bot.reply_to(message, "❌ Google Translate NOT connected")
+
+
+@bot.message_handler(commands=["testtranslate"])
+def testtranslate(message):
+    if message.from_user.id != OWNER_ID:
+        return
+
+    text = message.text.replace("/testtranslate", "", 1).strip()
+    if not text:
+        text = "Good morning, how are you today?"
+
+    result = translate_text(text, "en", "th")
+    if result:
+        bot.reply_to(message, f"✅ Test Translate OK:\n{result}")
+    else:
+        bot.reply_to(message, "❌ Test Translate failed. Check Render logs / Google JSON / billing.")
+
+
 @bot.message_handler(commands=["settopic"])
 def settopic(message):
     if not is_admin_or_owner(message):
