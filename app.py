@@ -56,6 +56,7 @@ GOOGLE_APPLICATION_CREDENTIALS_JSON = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_
 translate_client = None
 translate_cache = {}
 translate_cache_lock = threading.Lock()
+last_translate_error = None
 
 translate_parent = None
 
@@ -73,7 +74,7 @@ try:
         project_id = credentials_info.get("project_id")
         translate_parent = f"projects/{project_id}/locations/global"
 
-        print("✅ Google Cloud Translation V3 connected")
+        print("✅ Google Cloud Translation V3 connected", translate_parent)
     else:
         print("⚠️ GOOGLE_APPLICATION_CREDENTIALS_JSON not set. Auto translate disabled.")
 except Exception as e:
@@ -482,7 +483,9 @@ def translate_text(text, source, target):
         return final_text
 
     except Exception as e:
-        print("Google translate error:", e)
+        global last_translate_error
+        last_translate_error = repr(e)
+        print("Google translate error:", repr(e))
         return None
 
 def translate_to_chinese_better(text, source):
@@ -752,29 +755,38 @@ def autovi(message):
 
 @bot.message_handler(commands=["checkgoogle"])
 def checkgoogle(message):
-    if message.from_user.id != OWNER_ID:
+    if not is_admin_or_owner(message):
         return
 
     if translate_client and translate_parent:
-        bot.reply_to(message, "✅ Google Translate connected")
+        bot.reply_to(message, f"✅ Google Translate connected\n{translate_parent}")
     else:
         bot.reply_to(message, "❌ Google Translate NOT connected")
 
 
 @bot.message_handler(commands=["testtranslate"])
 def testtranslate(message):
-    if message.from_user.id != OWNER_ID:
+    if not is_admin_or_owner(message):
         return
 
-    text = message.text.replace("/testtranslate", "", 1).strip()
-    if not text:
-        text = "Good morning, how are you today?"
+    global last_translate_error
+    last_translate_error = None
 
-    result = translate_text(text, "en", "th")
-    if result:
-        bot.reply_to(message, f"✅ Test Translate OK:\n{result}")
-    else:
-        bot.reply_to(message, f"❌ Error:\n{str(e)}")
+    try:
+        text = message.text.replace("/testtranslate", "", 1).strip()
+        if not text:
+            text = "Good morning, how are you today?"
+
+        result = translate_text(text, "en", "th")
+
+        if result:
+            bot.reply_to(message, f"✅ Test Translate OK:\n{result}")
+        else:
+            err = last_translate_error or "translate_text returned None"
+            bot.reply_to(message, f"❌ Test Translate failed:\n{err}")
+
+    except Exception as e:
+        bot.reply_to(message, f"❌ REAL ERROR:\n{repr(e)}")
 
 
 @bot.message_handler(commands=["settopic"])
@@ -1222,6 +1234,6 @@ def text_handler(message):
     save_topic_messages(topic_records)
 
 
-print("Bot running...")
+print("Bot running... APP_FIXED_GOOGLE_V3")
 
 bot.infinity_polling(skip_pending=True)
