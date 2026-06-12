@@ -8,7 +8,10 @@ import threading
 
 from collections import defaultdict
 from telebot.types import InputMediaPhoto, InputMediaVideo
-from deep_translator import MyMemoryTranslator
+import html
+
+from google.cloud import translate_v2 as translate
+from google.oauth2 import service_account
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 OWNER_ID = 6527570402
@@ -44,9 +47,29 @@ album_map_lock = threading.Lock()
 ALBUM_DELAY = 25.0
 DELETE_RANGE = 100
 DELETE_SLEEP = 0.05
-TRANSLATE_SLEEP = 0.05
+TRANSLATE_SLEEP = 0.15
 FORWARD_SLEEP = 0.05
-TRANSLATE_MAX_LENGTH = 450
+TRANSLATE_MAX_LENGTH = 1200
+
+GOOGLE_APPLICATION_CREDENTIALS_JSON = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+
+translate_client = None
+translate_cache = {}
+translate_cache_lock = threading.Lock()
+
+try:
+    if GOOGLE_APPLICATION_CREDENTIALS_JSON:
+        credentials_info = json.loads(GOOGLE_APPLICATION_CREDENTIALS_JSON)
+        credentials = service_account.Credentials.from_service_account_info(
+            credentials_info
+        )
+        translate_client = translate.Client(credentials=credentials)
+        print("✅ Google Cloud Translation connected")
+    else:
+        print("⚠️ GOOGLE_APPLICATION_CREDENTIALS_JSON not set. Auto translate disabled.")
+except Exception as e:
+    translate_client = None
+    print("Google Cloud Translation init error:", e)
 
 IGNORE_FORWARD_PREFIXES = (
     "/tdel",
@@ -346,41 +369,113 @@ def split_long_text(text, max_length=450):
     return parts
 
 
+def should_skip_translate_text(text):
+    if not text:
+        return True
+
+    t = text.strip()
+    upper = t.upper()
+
+    if t.startswith("/"):
+        return True
+
+    skip_keywords = (
+        "TOTAL CASH",
+        "TOTAL",
+        "JOB",
+        "JOBS",
+        "BALANCE",
+        "PAID",
+        "PAYMENT",
+        "DELETED:",
+        "FAILED:",
+        "TDEL",
+        "TDELALBUM",
+        "SOURCE ",
+        "CLEAR DONE",
+        "USERBOT",
+        "LINKED TARGETS",
+    )
+
+    for word in skip_keywords:
+        if word in upper:
+            return True
+
+    # Too short and only symbols/numbers are not useful to translate.
+    letters = [c for c in t if c.isalpha()]
+    if len(letters) < 2:
+        return True
+
+    return False
+
+
 def translate_text(text, source, target):
+    if not translate_client:
+        return None
+
+    if should_skip_translate_text(text):
+        return None
+
     try:
         time.sleep(TRANSLATE_SLEEP)
 
         code_map = {
-            "th": "th-TH",
-            "vi": "vi-VN",
-            "en": "en-GB",
-            "zh-CN": "zh-CN"
+            "th": "th",
+            "vi": "vi",
+            "en": "en",
+            "zh-CN": "zh-CN",
+            "auto": None
         }
 
         source_lang = code_map.get(source, source)
         target_lang = code_map.get(target, target)
 
+        cache_key = f"{source_lang}->{target_lang}:{text}"
+
+        with translate_cache_lock:
+            if cache_key in translate_cache:
+                return translate_cache[cache_key]
+
         parts = split_long_text(text, TRANSLATE_MAX_LENGTH)
         translated_parts = []
 
         for part in parts:
-            result = MyMemoryTranslator(
-                source=source_lang,
-                target=target_lang
-            ).translate(part)
+            kwargs = {
+                "target_language": target_lang,
+                "format_": "text"
+            }
 
-            translated_parts.append(result)
-            time.sleep(0.3)
+            if source_lang:
+                kwargs["source_language"] = source_lang
 
-        return "\n".join(translated_parts)
+            result = translate_client.translate(
+                part,
+                **kwargs
+            )
+
+            translated = html.unescape(result.get("translatedText", ""))
+            translated_parts.append(translated)
+            time.sleep(TRANSLATE_SLEEP)
+
+        final_text = "\n".join(translated_parts).strip()
+
+        if not final_text:
+            return None
+
+        with translate_cache_lock:
+            if len(translate_cache) > 3000:
+                translate_cache.clear()
+            translate_cache[cache_key] = final_text
+
+        return final_text
 
     except Exception as e:
-        return f"⚠️ Translate busy.\n{e}"
-
+        print("Google translate error:", e)
+        return None
 
 def translate_to_chinese_better(text, source):
     en = translate_text(text, source, "en")
-    zh = translate_text(en, "en", "zh-CN")
+    zh = translate_text(text, source, "zh-CN")
     return en, zh
 
 
@@ -399,42 +494,84 @@ def auto_translate(message):
     if message.text.startswith("/"):
         return
 
+    text = message.text.strip()
+
+    if should_skip_translate_text(text):
+        return
+
     settings = load_translate_settings()
     key = get_chat_topic_key(message)
     mode = settings.get(key, {})
-    text = message.text
 
-    if mode.get("thai"):
-        if has_thai(text):
-            en, zh = translate_to_chinese_better(text, "th")
-            bot.reply_to(
-                message,
-                f"🇹🇭 Thai\n\n🇬🇧 English:\n{en}\n\n🇨🇳 中文:\n{zh}"
-            )
+    try:
+        if mode.get("thai"):
+            if has_thai(text):
+                en, zh = translate_to_chinese_better(text, "th")
 
-        elif has_chinese(text):
-            th = translate_text(text, "zh-CN", "th")
-            bot.reply_to(message, f"🇨🇳 中文 → 🇹🇭 Thai:\n{th}")
+                if not en and not zh:
+                    return
 
-        elif has_english(text):
-            th = translate_text(text, "en", "th")
-            bot.reply_to(message, f"🇬🇧 English → 🇹🇭 Thai:\n{th}")
+                reply_text = "🇹🇭 Thai\n\n"
 
-    if mode.get("vi"):
-        if has_vietnamese(text):
-            en, zh = translate_to_chinese_better(text, "vi")
-            bot.reply_to(
-                message,
-                f"🇻🇳 Vietnamese\n\n🇬🇧 English:\n{en}\n\n🇨🇳 中文:\n{zh}"
-            )
+                if en:
+                    reply_text += f"🇬🇧 English:\n{en}\n\n"
 
-        elif has_chinese(text):
-            vi = translate_text(text, "zh-CN", "vi")
-            bot.reply_to(message, f"🇨🇳 中文 → 🇻🇳 Vietnamese:\n{vi}")
+                if zh:
+                    reply_text += f"🇨🇳 中文:\n{zh}"
 
-        elif has_english(text):
-            vi = translate_text(text, "en", "vi")
-            bot.reply_to(message, f"🇬🇧 English → 🇻🇳 Vietnamese:\n{vi}")
+                bot.reply_to(message, reply_text.strip())
+
+            elif has_chinese(text):
+                th = translate_text(text, "zh-CN", "th")
+
+                if not th:
+                    return
+
+                bot.reply_to(message, f"🇨🇳 中文 → 🇹🇭 Thai:\n{th}")
+
+            elif has_english(text):
+                th = translate_text(text, "en", "th")
+
+                if not th:
+                    return
+
+                bot.reply_to(message, f"🇬🇧 English → 🇹🇭 Thai:\n{th}")
+
+        if mode.get("vi"):
+            if has_vietnamese(text):
+                en, zh = translate_to_chinese_better(text, "vi")
+
+                if not en and not zh:
+                    return
+
+                reply_text = "🇻🇳 Vietnamese\n\n"
+
+                if en:
+                    reply_text += f"🇬🇧 English:\n{en}\n\n"
+
+                if zh:
+                    reply_text += f"🇨🇳 中文:\n{zh}"
+
+                bot.reply_to(message, reply_text.strip())
+
+            elif has_chinese(text):
+                vi = translate_text(text, "zh-CN", "vi")
+
+                if not vi:
+                    return
+
+                bot.reply_to(message, f"🇨🇳 中文 → 🇻🇳 Vietnamese:\n{vi}")
+
+            elif has_english(text):
+                vi = translate_text(text, "en", "vi")
+
+                if not vi:
+                    return
+
+                bot.reply_to(message, f"🇬🇧 English → 🇻🇳 Vietnamese:\n{vi}")
+
+    except Exception as e:
+        print("auto translate error:", e)
 
 
 @bot.message_handler(commands=["del"])
