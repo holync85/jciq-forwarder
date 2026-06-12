@@ -10,7 +10,7 @@ from collections import defaultdict
 from telebot.types import InputMediaPhoto, InputMediaVideo
 import html
 
-from google.cloud import translate_v2 as translate
+from google.cloud import translate
 from google.oauth2 import service_account
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -57,18 +57,28 @@ translate_client = None
 translate_cache = {}
 translate_cache_lock = threading.Lock()
 
+translate_parent = None
+
 try:
     if GOOGLE_APPLICATION_CREDENTIALS_JSON:
         credentials_info = json.loads(GOOGLE_APPLICATION_CREDENTIALS_JSON)
         credentials = service_account.Credentials.from_service_account_info(
             credentials_info
         )
-        translate_client = translate.Client(credentials=credentials)
-        print("✅ Google Cloud Translation connected")
+
+        translate_client = translate.TranslationServiceClient(
+            credentials=credentials
+        )
+
+        project_id = credentials_info.get("project_id")
+        translate_parent = f"projects/{project_id}/locations/global"
+
+        print("✅ Google Cloud Translation V3 connected")
     else:
         print("⚠️ GOOGLE_APPLICATION_CREDENTIALS_JSON not set. Auto translate disabled.")
 except Exception as e:
     translate_client = None
+    translate_parent = None
     print("Google Cloud Translation init error:", e)
 
 IGNORE_FORWARD_PREFIXES = (
@@ -410,7 +420,7 @@ def should_skip_translate_text(text):
 
 
 def translate_text(text, source, target):
-    if not translate_client:
+    if not translate_client or not translate_parent:
         return None
 
     if should_skip_translate_text(text):
@@ -440,21 +450,23 @@ def translate_text(text, source, target):
         translated_parts = []
 
         for part in parts:
-            kwargs = {
-                "target_language": target_lang,
-                "format_": "text"
+            request = {
+                "parent": translate_parent,
+                "contents": [part],
+                "mime_type": "text/plain",
+                "target_language_code": target_lang
             }
 
             if source_lang:
-                kwargs["source_language"] = source_lang
+                request["source_language_code"] = source_lang
 
-            result = translate_client.translate(
-                part,
-                **kwargs
-            )
+            response = translate_client.translate_text(request=request)
 
-            translated = html.unescape(result.get("translatedText", ""))
-            translated_parts.append(translated)
+            if response.translations:
+                translated = response.translations[0].translated_text
+                translated = html.unescape(translated)
+                translated_parts.append(translated)
+
             time.sleep(TRANSLATE_SLEEP)
 
         final_text = "\n".join(translated_parts).strip()
