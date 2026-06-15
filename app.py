@@ -503,22 +503,95 @@ def run_auto_translate(message):
 
 
 def auto_translate(message):
-    if not message.text:
-        return
+    # Use current message text for normal auto-translate.
+    current_text = (getattr(message, "text", None) or "").strip()
 
-    if message.text.startswith("/"):
-        return
-
-    text = message.text.strip()
-
-    if should_skip_translate_text(text):
+    if current_text.startswith("/"):
         return
 
     settings = load_translate_settings()
     key = get_chat_topic_key(message)
     mode = settings.get(key, {})
 
+    if not mode.get("thai") and not mode.get("vi"):
+        return
+
     try:
+        # ✅ OPTION 1: Reply translate
+        # If user replies to an old message, translate the replied message content.
+        if getattr(message, "reply_to_message", None):
+            reply_text = (
+                getattr(message.reply_to_message, "text", None)
+                or getattr(message.reply_to_message, "caption", None)
+                or ""
+            ).strip()
+
+            if reply_text and not reply_text.startswith("/") and not should_skip_translate_text(reply_text):
+                if mode.get("thai"):
+                    if has_thai(reply_text):
+                        en, zh = translate_to_chinese_better(reply_text, "th")
+
+                        if en or zh:
+                            reply_text_out = "🇹🇭 Thai\n\n"
+                            if en:
+                                reply_text_out += f"🇬🇧 English:\n{en}\n\n"
+                            if zh:
+                                reply_text_out += f"🇨🇳 中文:\n{zh}"
+
+                            bot.reply_to(message, reply_text_out.strip())
+                            return
+
+                    elif has_chinese(reply_text):
+                        th = translate_text(reply_text, "zh-CN", "th")
+
+                        if th:
+                            bot.reply_to(message, f"🇨🇳 中文 → 🇹🇭 Thai:\n{th}")
+                            return
+
+                    elif has_english(reply_text):
+                        th = translate_text(reply_text, "en", "th")
+
+                        if th:
+                            bot.reply_to(message, f"🇬🇧 English → 🇹🇭 Thai:\n{th}")
+                            return
+
+                if mode.get("vi"):
+                    if has_vietnamese(reply_text):
+                        en, zh = translate_to_chinese_better(reply_text, "vi")
+
+                        if en or zh:
+                            reply_text_out = "🇻🇳 Vietnamese\n\n"
+                            if en:
+                                reply_text_out += f"🇬🇧 English:\n{en}\n\n"
+                            if zh:
+                                reply_text_out += f"🇨🇳 中文:\n{zh}"
+
+                            bot.reply_to(message, reply_text_out.strip())
+                            return
+
+                    elif has_chinese(reply_text):
+                        vi = translate_text(reply_text, "zh-CN", "vi")
+
+                        if vi:
+                            bot.reply_to(message, f"🇨🇳 中文 → 🇻🇳 Vietnamese:\n{vi}")
+                            return
+
+                    elif has_english(reply_text):
+                        vi = translate_text(reply_text, "en", "vi")
+
+                        if vi:
+                            bot.reply_to(message, f"🇬🇧 English → 🇻🇳 Vietnamese:\n{vi}")
+                            return
+
+        # ✅ Normal auto translate current new message.
+        if not current_text:
+            return
+
+        text = current_text
+
+        if should_skip_translate_text(text):
+            return
+
         if mode.get("thai"):
             if has_thai(text):
                 en, zh = translate_to_chinese_better(text, "th")
