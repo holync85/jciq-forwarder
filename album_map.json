@@ -1617,5 +1617,14 @@
         "message_id": 88
       }
     ]
+  },
+  "-1003923444843:14256819397082977": {
+    "source_chat_id": -1003923444843,
+    "source_media_group_id": "14256819397082977",
+    "source_message_ids": [
+      198,
+      199
+    ],
+    "targets": []
   }
 }
