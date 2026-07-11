@@ -50856,5 +50856,13 @@
         "message_id": 176
       }
     ]
+  },
+  "-1003845110865:14269928913606737": {
+    "source_chat_id": -1003845110865,
+    "source_media_group_id": "14269928913606737",
+    "source_message_ids": [
+      3028
+    ],
+    "targets": []
   }
 }
