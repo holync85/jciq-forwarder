@@ -1180,15 +1180,18 @@ def send_album(album_key):
     sending_albums.discard(album_key)
 
 
-@bot.message_handler(content_types=["photo", "video"])
+@bot.message_handler(content_types=["photo", "video", "animation", "document"])
 def media_handler(message):
     if should_ignore_forward(message):
         return
 
     run_auto_translate(message)
 
-    media_group_id = message.media_group_id
+    media_group_id = getattr(message, "media_group_id", None)
 
+    # =========================
+    # Album: photo/video group
+    # =========================
     if media_group_id:
         album_key = f"{message.chat.id}:{media_group_id}"
 
@@ -1211,54 +1214,121 @@ def media_handler(message):
             send_album,
             args=[album_key]
         )
-
         timers[album_key].start()
+        return
 
-    else:
-        targets = load_targets()
-        delete_records = []
-        topic_records = []
+    # ==============================================
+    # Single photo/video/animation/document forwarding
+    # Save every target message ID into delete_map.json
+    # so /tdel can remove all linked copies later.
+    # ==============================================
+    targets = load_targets()
+    delete_records = []
+    topic_records = []
 
-        for target in targets.values():
-            if SOURCE_CHAT_IDS[target["source"]] != message.chat.id:
+    for target in targets.values():
+        source_key = str(target.get("source"))
+
+        if source_key not in SOURCE_CHAT_IDS:
+            continue
+
+        if SOURCE_CHAT_IDS[source_key] != message.chat.id:
+            continue
+
+        try:
+            sent = None
+
+            if message.content_type == "photo" and message.photo:
+                sent = bot.send_photo(
+                    chat_id=target["chat_id"],
+                    photo=message.photo[-1].file_id,
+                    caption=message.caption,
+                    message_thread_id=target["topic_id"]
+                )
+
+            elif message.content_type == "video" and message.video:
+                sent = bot.send_video(
+                    chat_id=target["chat_id"],
+                    video=message.video.file_id,
+                    caption=message.caption,
+                    supports_streaming=True,
+                    message_thread_id=target["topic_id"]
+                )
+
+            elif message.content_type == "animation" and message.animation:
+                sent = bot.send_animation(
+                    chat_id=target["chat_id"],
+                    animation=message.animation.file_id,
+                    caption=message.caption,
+                    message_thread_id=target["topic_id"]
+                )
+
+            elif message.content_type == "document" and message.document:
+                sent = bot.send_document(
+                    chat_id=target["chat_id"],
+                    document=message.document.file_id,
+                    caption=message.caption,
+                    message_thread_id=target["topic_id"]
+                )
+
+            if sent is None:
+                print(
+                    "Single media skipped:",
+                    message.content_type,
+                    message.chat.id,
+                    message.message_id
+                )
                 continue
 
-            try:
-                if message.photo:
-                    sent = bot.send_photo(
-                        target["chat_id"],
-                        message.photo[-1].file_id,
-                        caption=message.caption,
-                        message_thread_id=target["topic_id"]
-                    )
+            delete_records.append({
+                "source_chat_id": int(message.chat.id),
+                "source_msg_id": int(message.message_id),
+                "target_chat_id": int(sent.chat.id),
+                "target_msg_id": int(sent.message_id)
+            })
 
-                elif message.video:
-                    sent = bot.send_video(
-                        target["chat_id"],
-                        message.video.file_id,
-                        caption=message.caption,
-                        message_thread_id=target["topic_id"]
-                    )
+            topic_records.append({
+                "chat_id": int(sent.chat.id),
+                "topic_id": int(target["topic_id"]),
+                "message_id": int(sent.message_id)
+            })
 
-                delete_records.append({
-                    "source_chat_id": message.chat.id,
-                    "source_msg_id": message.message_id,
-                    "target_chat_id": sent.chat.id,
-                    "target_msg_id": sent.message_id
-                })
+            print(
+                "MEDIA MAP:",
+                message.content_type,
+                f"{message.chat.id}:{message.message_id}",
+                "->",
+                sent.chat.id,
+                sent.message_id
+            )
 
-                topic_records.append({
-                    "chat_id": sent.chat.id,
-                    "topic_id": target["topic_id"],
-                    "message_id": sent.message_id
-                })
+            time.sleep(FORWARD_SLEEP)
 
-                time.sleep(FORWARD_SLEEP)
+        except Exception as e:
+            print(
+                "Single media send error:",
+                message.content_type,
+                message.chat.id,
+                message.message_id,
+                repr(e)
+            )
 
-            except Exception as e:
-                print("Single media send error:", e)
-
+    if delete_records:
         save_delete_records(delete_records)
+        print(
+            "DELETE MAP WRITTEN:",
+            f"{message.chat.id}:{message.message_id}",
+            "targets:",
+            len(delete_records)
+        )
+    else:
+        print(
+            "DELETE MAP EMPTY:",
+            message.content_type,
+            f"{message.chat.id}:{message.message_id}"
+        )
+
+    if topic_records:
         save_topic_messages(topic_records)
 
 
