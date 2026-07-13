@@ -3200,5 +3200,14 @@
         "message_id": 287
       }
     ]
+  },
+  "-1003773595786:14271309536887609": {
+    "source_chat_id": -1003773595786,
+    "source_media_group_id": "14271309536887609",
+    "source_message_ids": [
+      96,
+      97
+    ],
+    "targets": []
   }
 }
