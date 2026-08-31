@@ -24,6 +24,7 @@ SOURCE_CHAT_IDS = {
     "2": int(os.getenv("SOURCE_CHAT_ID_2")),
     "3": int(os.getenv("SOURCE_CHAT_ID_3")),
     "4": int(os.getenv("SOURCE_CHAT_ID_4")),
+    "5": int(os.getenv("SOURCE_CHAT_ID_5")),
 }
 
 bot = telebot.TeleBot(BOT_TOKEN, threaded=True, num_threads=50)
